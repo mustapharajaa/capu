@@ -92,7 +92,8 @@ async function downloadYouTubeVideo(url, progressCallback) {
                 '--no-playlist',
                 '--write-info-json',
                 '--ffmpeg-location', FFMPEG_PATH,
-                '--merge-output-format', 'mp4'
+                '--merge-output-format', 'mp4',
+                '--postprocessor-args', 'ffmpeg:-c:v copy -c:a aac -strict -2'
             ];
             
             // Add cookies if file exists (EXACTLY like reference app)
