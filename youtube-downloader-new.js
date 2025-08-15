@@ -72,7 +72,12 @@ async function downloadYouTubeVideo(url, progressCallback) {
             }
             const sanitizedTitle = sanitizeFilename(metadata.title);
 
+            // Option 1: No timestamp (RISKY - may overwrite files)
+            // const outputFilename = `${sanitizedTitle}.mp4`;
+            
+            // Option 2: Keep timestamp for safety (RECOMMENDED)
             const outputFilename = `${timestamp}_${sanitizedTitle}.mp4`;
+            
             const outputPath = path.join(UPLOADS_DIR, outputFilename);
             const infoJsonPath = path.join(UPLOADS_DIR, `${timestamp}_${sanitizedTitle}.info.json`);
 
