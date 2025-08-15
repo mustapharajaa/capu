@@ -2,9 +2,58 @@
 echo.
 echo ========================================
 echo   CapCut Automation Setup (Windows)
+echo   TRUE ONE-CLICK INSTALLER
 echo ========================================
 echo.
 
+REM Check if Node.js is installed
+node --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Node.js not found. Installing Node.js...
+    echo.
+    echo Downloading Node.js LTS...
+    
+    REM Create temp directory
+    if not exist "%temp%\capcut-setup" mkdir "%temp%\capcut-setup"
+    
+    REM Download Node.js installer using PowerShell
+    powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://nodejs.org/dist/v18.19.0/node-v18.19.0-x64.msi' -OutFile '%temp%\capcut-setup\nodejs.msi'}"
+    
+    if exist "%temp%\capcut-setup\nodejs.msi" (
+        echo Installing Node.js...
+        msiexec /i "%temp%\capcut-setup\nodejs.msi" /quiet /norestart
+        
+        echo Waiting for Node.js installation to complete...
+        timeout /t 30 /nobreak >nul
+        
+        REM Refresh environment variables
+        call refreshenv >nul 2>&1
+        
+        REM Add Node.js to PATH for current session
+        set "PATH=%PATH%;%ProgramFiles%\nodejs"
+        
+        echo Node.js installation completed!
+        echo.
+        
+        REM Clean up
+        del "%temp%\capcut-setup\nodejs.msi" >nul 2>&1
+        rmdir "%temp%\capcut-setup" >nul 2>&1
+    ) else (
+        echo Failed to download Node.js installer.
+        echo Please install Node.js manually from https://nodejs.org/
+        pause
+        exit /b 1
+    )
+) else (
+    echo Node.js is already installed.
+)
+
+echo.
+echo Verifying Node.js installation...
+node --version
+npm --version
+
+echo.
 echo Installing Node.js dependencies...
 call npm install
 
@@ -16,7 +65,22 @@ echo Running automated setup...
 node setup.js
 
 echo.
-echo Setup complete! You can now run:
-echo   npm start
+echo Creating configuration files...
+if not exist ".env" copy ".env.example" ".env" >nul 2>&1
+if not exist "editors.json" copy "editors.json.example" "editors.json" >nul 2>&1
+if not exist "new videos" copy "new videos.example" "new videos" >nul 2>&1
+
+echo.
+echo ========================================
+echo   SETUP COMPLETE!
+echo ========================================
+echo.
+echo Next steps:
+echo 1. Edit .env file with your Google Sheets credentials
+echo 2. Edit editors.json with your CapCut editor URLs
+echo 3. Run: npm start
+echo 4. Open: http://localhost:3000
+echo.
+echo Your CapCut automation system is ready!
 echo.
 pause
