@@ -12,18 +12,7 @@ if (!YTDLP_BINARY_PATH || !fs.existsSync(YTDLP_BINARY_PATH)) {
     throw new Error('YTDLP_PATH environment variable is not set or points to a non-existent file. Please check your .env file.');
 }
 
-// Check for YouTube cookies file
-const COOKIES_PATH = path.join(__dirname, 'youtube-cookies.txt');
-const cookiesExist = fs.existsSync(COOKIES_PATH);
-
-// Initialize yt-dlp with cookies if available
 const ytDlpWrap = new YtDlpWrap(YTDLP_BINARY_PATH);
-if (cookiesExist) {
-    console.log('✅ YouTube cookies file found - authentication enabled');
-} else {
-    console.log('⚠️ YouTube cookies file not found - downloads may be limited');
-}
-
 // Get the ffmpeg binary path from environment variables, with a fallback to the package
 const FFMPEG_PATH = process.env.FFMPEG_PATH || ffmpeg.path;
 if (!FFMPEG_PATH || !fs.existsSync(FFMPEG_PATH)) {
@@ -96,16 +85,9 @@ async function downloadWithFFmpegMerge(url, outputPath, progressCallback) {
             '--format', 'best[height<=1080]/bestvideo[height<=1080]+bestaudio/best',
             '--output', '-',  // Output to stdout
             '--no-playlist',
-            '--merge-output-format', 'mp4'
+            '--merge-output-format', 'mp4',
+            url
         ];
-        
-        // Add cookies if available
-        if (cookiesExist) {
-            ytdlpArgs.push('--cookies', COOKIES_PATH);
-            console.log('🍪 Using YouTube cookies for authentication');
-        }
-        
-        ytdlpArgs.push(url);
 
         // FFmpeg command to merge the streams in real-time
         const ffmpegArgs = [
@@ -121,7 +103,6 @@ async function downloadWithFFmpegMerge(url, outputPath, progressCallback) {
         console.log(`🎬 FFmpeg: ${FFMPEG_PATH} ${ffmpegArgs.join(' ')}`);
 
         // Spawn yt-dlp process
-        console.log('--- EXECUTING YT-DLP WITH ARGS:', ytdlpArgs.join(' '));
         const ytdlp = spawn(YTDLP_BINARY_PATH, ytdlpArgs, {
             stdio: ['pipe', 'pipe', 'pipe']
         });
@@ -230,13 +211,7 @@ function updateVideosJson(videoName, description, status, timestamp, filename) {
 
 async function getVideoInfo(url) {
     try {
-        // Add cookies option if available
-        const options = {};
-        if (cookiesExist) {
-            options.cookies = COOKIES_PATH;
-            console.log('🍪 Using cookies for video info fetch');
-        }
-        return await ytDlpWrap.getVideoInfo(url, options);
+        return await ytDlpWrap.getVideoInfo(url);
     } catch (error) {
         console.error(`Failed to get video info for ${url}:`, error);
         throw error;
