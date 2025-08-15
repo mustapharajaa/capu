@@ -328,15 +328,157 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         console.log(`✅ Video "${videoFileName}" uploaded and transcoded successfully!`);
         if (progressCallback) progressCallback(`✅ Video "${videoFileName}" upload completed!`);
 
-        // Click the media item to add it to timeline (reference app method)
-        console.log('🎬 Adding video to timeline...');
-        // Use the already found video element instead of searching again
-        const freshMediaItemContainer = await videoTextElement.evaluateHandle(node => node.parentElement);
-        const mediaItemElement = await freshMediaItemContainer.asElement();
-        await mediaItemElement.click();
+        // Wait for upload badge to disappear before adding to timeline
+        console.log('🔍 Checking for upload badge...');
+        if (progressCallback) progressCallback('🔍 Waiting for upload badge to clear...');
         
-        console.log('✅ Video successfully added to timeline!');
-        if (progressCallback) progressCallback('🎬 Video added to timeline successfully!');
+        try {
+            const uploadBadgeSelectors = [
+                'span.lv-badge-number.badge-dwkIhr',
+                '.upload-task-icon-JXoMbD span.lv-badge-number',
+                'xpath//span[@class="lv-badge-number badge-dwkIhr badge-zoom-enter-done"]',
+                'xpath//*[@id="workbench"]/div[1]/div/div[2]/div/div/div/div[1]/div[1]/div[2]/span/span'
+            ];
+            
+            let uploadBadgeFound = false;
+            for (const selector of uploadBadgeSelectors) {
+                try {
+                    let badgeElement;
+                    if (selector.startsWith('xpath//')) {
+                        const xpath = selector.replace('xpath//', '');
+                        badgeElement = await page.waitForSelector(`xpath/${xpath}`, { timeout: 3000 });
+                    } else {
+                        badgeElement = await page.$(selector);
+                    }
+                    
+                    if (badgeElement) {
+                        uploadBadgeFound = true;
+                        console.log(`🔍 Found upload badge with selector: ${selector}`);
+                        if (progressCallback) progressCallback('⏳ Upload badge detected, waiting for completion...');
+                        
+                        // Wait for badge to disappear (up to 40 minutes)
+                        console.log('⏳ Waiting for upload badge to disappear (up to 40 minutes)...');
+                        await page.waitForFunction(
+                            (selector) => {
+                                if (selector.startsWith('xpath//')) {
+                                    const xpath = selector.replace('xpath//', '');
+                                    const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+                                    return !result.singleNodeValue;
+                                } else {
+                                    const element = document.querySelector(selector);
+                                    return !element;
+                                }
+                            },
+                            { timeout: 2400000 }, // 40 minutes
+                            selector
+                        );
+                        
+                        console.log('✅ Upload badge disappeared - upload fully complete!');
+                        if (progressCallback) progressCallback('✅ Upload badge cleared - ready for timeline!');
+                        break;
+                    }
+                } catch (e) {
+                    // Badge not found with this selector, try next
+                }
+            }
+            
+            if (!uploadBadgeFound) {
+                console.log('✅ No upload badge found - upload already complete');
+                if (progressCallback) progressCallback('✅ No upload badge - ready for timeline!');
+            }
+            
+        } catch (e) {
+            console.log('⚠️ Upload badge check failed, proceeding anyway:', e.message);
+            if (progressCallback) progressCallback('⚠️ Upload badge check timeout - proceeding...');
+        }
+
+        // Click the media item to add it to timeline with robust fallback selectors
+        console.log('🎬 Adding video to timeline...');
+        
+        let videoAddedToTimeline = false;
+        const timelineAddSelectors = [
+            // Method 1: Try using the existing video element (if not detached)
+            async () => {
+                try {
+                    const freshMediaItemContainer = await videoTextElement.evaluateHandle(node => node.parentElement);
+                    const mediaItemElement = await freshMediaItemContainer.asElement();
+                    await mediaItemElement.click();
+                    return true;
+                } catch (e) {
+                    console.log('⚠️ Method 1 failed (DOM detachment):', e.message);
+                    return false;
+                }
+            },
+            
+            // Method 2: Use exact CapCut video card structure
+            async () => {
+                try {
+                    console.log('🔄 Method 2: Using exact CapCut card structure...');
+                    
+                    // Target the exact CapCut video card structure
+                    const cardSelectors = [
+                        'div.card-item__content-nKehsC',
+                        'div[class*="card-item__content"]',
+                        'div[class*="card-container"]',
+                        '.card-item__content-nKehsC',
+                        '.children-BxrZUf',
+                        '.card-container-tIRTNo'
+                    ];
+                    
+                    for (const selector of cardSelectors) {
+                        try {
+                            const elements = await page.$$(selector);
+                            if (elements && elements.length > 0) {
+                                // Click the first video card found
+                                await elements[0].click();
+                                console.log(`✅ Video clicked using CapCut card selector: ${selector}`);
+                                return true;
+                            }
+                        } catch (e) {
+                            console.log(`⚠️ Card selector failed: ${selector}`, e.message);
+                        }
+                    }
+                    
+                    // Fallback: Try to find any card with video content
+                    try {
+                        const videoCardXPath = '//div[contains(@class, "card-item__content") or contains(@class, "card-container")]';
+                        const cardElement = await page.waitForSelector(`xpath/${videoCardXPath}`, { timeout: 2000 });
+                        if (cardElement) {
+                            await cardElement.click();
+                            console.log('✅ Video clicked using XPath card selector');
+                            return true;
+                        }
+                    } catch (e) {
+                        console.log('⚠️ XPath card selector failed:', e.message);
+                    }
+                    
+                    return false;
+                } catch (e) {
+                    console.log('⚠️ Method 2 failed:', e.message);
+                    return false;
+                }
+            }
+        ];
+        
+        // Try each method until one succeeds
+        for (let i = 0; i < timelineAddSelectors.length; i++) {
+            try {
+                console.log(`🔄 Trying timeline addition method ${i + 1}/${timelineAddSelectors.length}...`);
+                const success = await timelineAddSelectors[i]();
+                if (success) {
+                    videoAddedToTimeline = true;
+                    console.log('✅ Video successfully added to timeline!');
+                    if (progressCallback) progressCallback('🎬 Video added to timeline successfully!');
+                    break;
+                }
+            } catch (e) {
+                console.log(`⚠️ Timeline addition method ${i + 1} failed:`, e.message);
+            }
+        }
+        
+        if (!videoAddedToTimeline) {
+            throw new Error('Failed to add video to timeline - all selector methods failed');
+        }
 
         // Monitor for video loading completion (if loading image appears)
         console.log('🔍 Checking for video loading indicator...');
@@ -1078,13 +1220,35 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         // Keep editor status as "in-use" - do not reset to available
         console.log('📝 Editor remains "in-use" for future automations');
         
-        // Close only the current page/tab, keep browser instance running for reuse
+        // Robust tab/context cleanup for RDP environments
         if (page) {
             try {
+                // First, try to clear any running scripts/contexts
+                try {
+                    await page.evaluate(() => {
+                        // Clear any running intervals/timeouts
+                        for (let i = 1; i < 99999; i++) {
+                            clearInterval(i);
+                            clearTimeout(i);
+                        }
+                        // Clear page references
+                        window.stop && window.stop();
+                    });
+                } catch (evalError) {
+                    console.log('⚠️ Context cleanup evaluation failed (expected on destroyed context)');
+                }
+                
+                // Close the page/tab
                 await page.close();
-                console.log('📄 Tab closed, browser instance kept running for reuse');
+                console.log('📄 Tab closed with context cleanup, browser instance kept running for reuse');
             } catch (closeError) {
                 console.log('⚠️ Could not close tab:', closeError.message);
+                // Force close if normal close fails
+                try {
+                    await page.close();
+                } catch (forceError) {
+                    console.log('⚠️ Force close also failed:', forceError.message);
+                }
             }
         }
         
