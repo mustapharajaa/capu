@@ -47,10 +47,19 @@ async function downloadYouTubeVideo(url, progressCallback) {
     return new Promise(async (resolve, reject) => {
         try {
             const timestamp = Date.now();
+            const cookiesPath = path.join(__dirname, 'youtube-cookies.txt');
 
             // Get video metadata first to get the title for the filename
             console.log('Fetching video metadata...');
-            const metadata = await ytDlpWrap.getVideoInfo(url);
+            let metadata;
+            
+            if (fs.existsSync(cookiesPath)) {
+                console.log('✅ Using cookies for metadata fetch');
+                metadata = await ytDlpWrap.getVideoInfo(url, ['--cookies', cookiesPath]);
+            } else {
+                console.log('⚠️ No cookies file - metadata fetch may fail due to bot detection');
+                metadata = await ytDlpWrap.getVideoInfo(url);
+            }
             const sanitizedTitle = sanitizeFilename(metadata.title);
 
             const outputFilename = `${timestamp}_${sanitizedTitle}.mp4`;
@@ -61,13 +70,23 @@ async function downloadYouTubeVideo(url, progressCallback) {
             fs.writeFileSync(infoJsonPath, JSON.stringify(metadata, null, 2));
             console.log(`Saved .info.json to ${infoJsonPath}`);
 
+            // Check for cookies file and add to arguments if present
             const ytdlpArgs = [
                 '--format', 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
                 '--output', outputPath,
                 '--no-playlist',
-                '--merge-output-format', 'mp4',
-                url
+                '--merge-output-format', 'mp4'
             ];
+            
+            // Add cookies if file exists
+            if (fs.existsSync(cookiesPath)) {
+                ytdlpArgs.push('--cookies', cookiesPath);
+                console.log('✅ Using YouTube cookies for authentication');
+            } else {
+                console.log('⚠️ No cookies file found - downloads may be limited by bot detection');
+            }
+            
+            ytdlpArgs.push(url);
 
             console.log(`Starting download: yt-dlp ${ytdlpArgs.join(' ')}`);
             if (progressCallback) progressCallback({ message: 'Starting download...' });
