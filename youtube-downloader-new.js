@@ -12,16 +12,10 @@ if (!YTDLP_BINARY_PATH || !fs.existsSync(YTDLP_BINARY_PATH)) {
     throw new Error('YTDLP_PATH environment variable is not set or points to a non-existent file. Please check your .env file.');
 }
 
-// Check for YouTube cookies file for user feedback
-const COOKIES_PATH = path.join(__dirname, 'youtube-cookies.txt');
-const cookiesExist = fs.existsSync(COOKIES_PATH);
-
 const ytDlpWrap = new YtDlpWrap(YTDLP_BINARY_PATH);
-if (cookiesExist) {
-    console.log('✅ YouTube cookies file found - authentication enabled');
-} else {
-    console.log('⚠️ YouTube cookies file not found - downloads may be limited');
-}
+
+// Version identifier for tracking deployments
+console.log('🔧 YouTube Downloader Version: 2.0.0 - Reference App Compatible (2025-01-15)');
 
 // Get the ffmpeg binary path from environment variables, with a fallback to the package
 const FFMPEG_PATH = process.env.FFMPEG_PATH || ffmpeg.path;
