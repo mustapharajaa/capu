@@ -12,11 +12,10 @@ if (!YTDLP_BINARY_PATH || !fs.existsSync(YTDLP_BINARY_PATH)) {
     throw new Error('YTDLP_PATH environment variable is not set or points to a non-existent file. Please check your .env file.');
 }
 
-// Check for YouTube cookies file
+// Check for YouTube cookies file for user feedback
 const COOKIES_PATH = path.join(__dirname, 'youtube-cookies.txt');
 const cookiesExist = fs.existsSync(COOKIES_PATH);
 
-// Initialize yt-dlp with cookies if available
 const ytDlpWrap = new YtDlpWrap(YTDLP_BINARY_PATH);
 if (cookiesExist) {
     console.log('✅ YouTube cookies file found - authentication enabled');
@@ -60,24 +59,46 @@ async function downloadYouTubeVideo(url, progressCallback) {
             const metadata = await ytDlpWrap.getVideoInfo(url);
             const sanitizedTitle = sanitizeFilename(metadata.title);
 
-            const outputFilename = `${sanitizedTitle}.mp4`;
+            const outputFilename = `${timestamp}_${sanitizedTitle}.mp4`;
             const outputPath = path.join(UPLOADS_DIR, outputFilename);
-            const infoJsonPath = path.join(UPLOADS_DIR, `${sanitizedTitle}.info.json`);
+            const infoJsonPath = path.join(UPLOADS_DIR, `${timestamp}_${sanitizedTitle}.info.json`);
 
             // Save the metadata we already fetched to the .info.json file
             fs.writeFileSync(infoJsonPath, JSON.stringify(metadata, null, 2));
             console.log(`Saved .info.json to ${infoJsonPath}`);
 
-            // Real-time FFmpeg merging with yt-dlp piping
-            console.log('🚀 Starting REAL-TIME FFmpeg merge...');
-            if (progressCallback) progressCallback({ message: 'Starting real-time merge...' });
+            const ytdlpArgs = [
+                '--format', 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
+                '--output', outputPath,
+                '--no-playlist',
+                '--merge-output-format', 'mp4',
+                url
+            ];
 
-            await downloadWithFFmpegMerge(url, outputPath, progressCallback);
-            
-            console.log(`✅ Real-time merge completed: ${outputPath}`);
-            updateVideosJson(sanitizedTitle, metadata.description, 'downloaded', timestamp, outputFilename);
-            if (progressCallback) progressCallback({ message: `DOWNLOADED: ${outputPath}`, progress: 100, isComplete: true, finalPath: outputPath });
-            resolve(outputPath);
+            console.log(`Starting download: yt-dlp ${ytdlpArgs.join(' ')}`);
+            if (progressCallback) progressCallback({ message: 'Starting download...' });
+
+            ytDlpWrap.exec(ytdlpArgs)
+                .on('progress', (progress) => {
+                    const percent = progress.percent ? progress.percent.toFixed(1) : 0;
+                    const message = `Downloading... ${percent}% at ${progress.currentSpeed || 'N/A'}`;
+                    if (progressCallback) progressCallback({ message: message, progress: percent });
+                })
+                .on('ytDlpEvent', (eventType, eventData) => {
+                    console.log(`[${eventType}] ${eventData}`);
+                    if (progressCallback) progressCallback({ message: `[${eventType}] ${eventData}` });
+                })
+                .on('error', (error) => {
+                    console.error('Error during download:', error);
+                    if (progressCallback) progressCallback({ message: `Error: ${error.message}` });
+                    reject(error);
+                })
+                .on('close', () => {
+                    console.log(`Download finished: ${outputPath}`);
+                    updateVideosJson(sanitizedTitle, metadata.description, 'downloaded', timestamp, outputFilename);
+                    if (progressCallback) progressCallback({ message: `DOWNLOADED: ${outputPath}`, progress: 100, isComplete: true, finalPath: outputPath });
+                    resolve(outputPath);
+                });
 
         } catch (error) {
             console.error('An error occurred in downloadYouTubeVideo:', error);
@@ -230,13 +251,7 @@ function updateVideosJson(videoName, description, status, timestamp, filename) {
 
 async function getVideoInfo(url) {
     try {
-        // Add cookies option if available
-        const options = {};
-        if (cookiesExist) {
-            options.cookies = COOKIES_PATH;
-            console.log('🍪 Using cookies for video info fetch');
-        }
-        return await ytDlpWrap.getVideoInfo(url, options);
+        return await ytDlpWrap.getVideoInfo(url);
     } catch (error) {
         console.error(`Failed to get video info for ${url}:`, error);
         throw error;
