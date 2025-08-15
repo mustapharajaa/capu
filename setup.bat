@@ -6,9 +6,26 @@ echo   TRUE ONE-CLICK INSTALLER
 echo ========================================
 echo.
 
-REM Check if Node.js is installed
+REM Check if Node.js is installed (check multiple locations)
+set "NODE_FOUND=0"
+
+REM Try standard PATH first
 node --version >nul 2>&1
-if %errorlevel% neq 0 (
+if %errorlevel% equ 0 set "NODE_FOUND=1"
+
+REM Try Program Files location
+if %NODE_FOUND% equ 0 (
+    "%ProgramFiles%\nodejs\node.exe" --version >nul 2>&1
+    if %errorlevel% equ 0 set "NODE_FOUND=1"
+)
+
+REM Try Program Files (x86) location
+if %NODE_FOUND% equ 0 (
+    "%ProgramFiles(x86)%\nodejs\node.exe" --version >nul 2>&1
+    if %errorlevel% equ 0 set "NODE_FOUND=1"
+)
+
+if %NODE_FOUND% equ 0 (
     echo Node.js not found. Installing Node.js...
     echo.
     echo Downloading Node.js LTS...
@@ -61,19 +78,55 @@ if %errorlevel% neq 0 (
 
 echo.
 echo Verifying Node.js installation...
-node --version
-npm --version
+
+REM Use the installed Node.js (try different paths)
+if exist "%ProgramFiles%\nodejs\node.exe" (
+    "%ProgramFiles%\nodejs\node.exe" --version
+    "%ProgramFiles%\nodejs\npm.cmd" --version
+    set "PATH=%PATH%;%ProgramFiles%\nodejs"
+) else if exist "%ProgramFiles(x86)%\nodejs\node.exe" (
+    "%ProgramFiles(x86)%\nodejs\node.exe" --version
+    "%ProgramFiles(x86)%\nodejs\npm.cmd" --version
+    set "PATH=%PATH%;%ProgramFiles(x86)%\nodejs"
+) else (
+    node --version
+    npm --version
+)
 
 echo.
 echo Installing Node.js dependencies...
-call npm install
+
+REM Use the correct npm path
+if exist "%ProgramFiles%\nodejs\npm.cmd" (
+    call "%ProgramFiles%\nodejs\npm.cmd" install
+) else if exist "%ProgramFiles(x86)%\nodejs\npm.cmd" (
+    call "%ProgramFiles(x86)%\nodejs\npm.cmd" install
+) else (
+    call npm install
+)
 
 echo Installing FFmpeg npm package (fallback for setup)...
-call npm install @ffmpeg-installer/ffmpeg
+
+REM Use the correct npm path
+if exist "%ProgramFiles%\nodejs\npm.cmd" (
+    call "%ProgramFiles%\nodejs\npm.cmd" install @ffmpeg-installer/ffmpeg
+) else if exist "%ProgramFiles(x86)%\nodejs\npm.cmd" (
+    call "%ProgramFiles(x86)%\nodejs\npm.cmd" install @ffmpeg-installer/ffmpeg
+) else (
+    call npm install @ffmpeg-installer/ffmpeg
+)
 
 echo.
 echo Running automated setup...
-node setup.js
+
+REM Use the correct node path
+if exist "%ProgramFiles%\nodejs\node.exe" (
+    "%ProgramFiles%\nodejs\node.exe" setup.js
+) else if exist "%ProgramFiles(x86)%\nodejs\node.exe" (
+    "%ProgramFiles(x86)%\nodejs\node.exe" setup.js
+) else (
+    node setup.js
+)
 
 echo.
 echo Creating configuration files...
