@@ -10,6 +10,23 @@ require('dotenv').config();
 // Initialize batch processor
 const batchProcessor = new BatchProcessor();
 
+// Function to count currently running automations
+function getRunningAutomationsCount() {
+    try {
+        const editorsFile = path.join(__dirname, 'editors.json');
+        if (!fs.existsSync(editorsFile)) {
+            return 0;
+        }
+
+        const editors = JSON.parse(fs.readFileSync(editorsFile, 'utf8'));
+        const runningAutomations = editors.filter(editor => editor.status === 'in-use');
+        return runningAutomations.length;
+    } catch (error) {
+        console.error('❌ Error counting running automations:', error.message);
+        return 0;
+    }
+}
+
 // Auto-start batch processor on server startup (if enabled in .env)
 setTimeout(() => {
     const batchProcessorEnabled = process.env['batch-processor'] === 'true';
@@ -88,6 +105,30 @@ app.post('/upload', upload.single('video'), async (req, res) => {
 
     try {
         console.log('📼 Starting CapCut automation for local upload...');
+        
+        // Check concurrent automation limit (maximum 3)
+        const maxConcurrent = 3;
+        const runningCount = getRunningAutomationsCount();
+        
+        if (runningCount >= maxConcurrent) {
+            console.log(`🔒 Automation limit reached: ${runningCount}/${maxConcurrent} automations running`);
+            console.log('❌ Local upload blocked - too many concurrent automations');
+            
+            // Delete the uploaded file since automation cannot proceed
+            if (fs.existsSync(absoluteFilePath)) {
+                fs.unlinkSync(absoluteFilePath);
+                console.log(`🗑️ Deleted uploaded file: ${path.basename(absoluteFilePath)}`);
+            }
+            
+            return res.status(429).json({
+                success: false,
+                message: `Too many concurrent automations (${runningCount}/${maxConcurrent}). Please wait for an automation to complete before uploading.`,
+                runningCount: runningCount,
+                maxConcurrent: maxConcurrent
+            });
+        }
+        
+        console.log(`🚀 Starting automation (${runningCount + 1}/${maxConcurrent} slots used)`);
         
         // Start CapCut automation with the uploaded file
         await runSimpleUpload(absoluteFilePath, (message) => {
