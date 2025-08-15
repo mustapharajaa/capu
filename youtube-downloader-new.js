@@ -121,6 +121,7 @@ async function downloadWithFFmpegMerge(url, outputPath, progressCallback) {
         console.log(`🎬 FFmpeg: ${FFMPEG_PATH} ${ffmpegArgs.join(' ')}`);
 
         // Spawn yt-dlp process
+        console.log('--- EXECUTING YT-DLP WITH ARGS:', ytdlpArgs.join(' '));
         const ytdlp = spawn(YTDLP_BINARY_PATH, ytdlpArgs, {
             stdio: ['pipe', 'pipe', 'pipe']
         });

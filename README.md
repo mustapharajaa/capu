@@ -2,67 +2,21 @@
 
 A comprehensive automation system for CapCut video processing with YouTube integration, background removal, and Google Sheets logging.
 
-## 🚀 Super Simple Installation
+## Installation
 
-### **Step 1: Download**
-- Go to https://github.com/mustapharajaa/capu
-- Click **"Code"** → **"Download ZIP"**
-- Extract anywhere (e.g., `C:\capu`)
-
-### **Step 2: One-Click Install**
-**For Command Prompt:**
+download folder    https://github.com/mustapharajaa/capu
 ```cmd
-cd C:\capu
 setup.bat
+npm cache clean --force
+npm install
+node setup.js
+add your .env.exemple details to .env paths it auto update
+edite editors.json and new videos file
+edite youtube-cookies 
+npm start
 ```
 
-**For PowerShell:**
-```powershell
-cd C:\capu
-.\setup.bat
-```
-
-**That's it!** The installer automatically:
-- ✅ Downloads and installs Node.js (if needed)
-- ✅ Downloads FFmpeg and yt-dlp
-- ✅ Installs all dependencies
-- ✅ Creates configuration files
-- ✅ Sets up everything for you
-
-### **Step 3: Configure & Run**
-After setup completes:
-1. **Edit your settings** (optional):
-   - `.env` - Add Google Sheets credentials
-   - `editors.json` - Add CapCut editor URLs
-
-2. **Start the app:**
-   ```cmd
-   npm start
-   ```
-
-3. **Open browser:** http://localhost:3000
-
-## **That's All! 🎉**
-Two steps: Download → Run setup.bat
-
-### Troubleshooting Common Issues
-
-**"Git is not recognized":**
-- Download ZIP from GitHub instead of cloning
-- Or install Git from https://git-scm.com/
-
-**"The system cannot find the path specified":**
-- Use the correct path for your system
-- Check if the folder exists: `dir C:\path\to\capu`
-
-**"Node.js not found":**
-- Install Node.js from https://nodejs.org/
-- Restart command prompt after installation
-
-**Setup fails:**
-- Run as Administrator
-- Check internet connection for downloads
-- Use manual installation method
+Open: http://localhost:3000
 
 ## 📋 Features
 
