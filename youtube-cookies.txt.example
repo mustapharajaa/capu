@@ -1,0 +1,12 @@
+# YouTube Cookies File Example
+# 
+# To use YouTube cookies for authentication:
+# 1. Export cookies from your browser using a browser extension
+# 2. Save the cookies as 'youtube-cookies.txt' in this directory
+# 3. The automation will automatically use these cookies for YouTube downloads
+#
+# This file should contain cookies in Netscape format
+# Example format:
+# .youtube.com	TRUE	/	FALSE	1234567890	cookie_name	cookie_value
+#
+# Note: Keep your actual cookies file private and never commit it to version control
