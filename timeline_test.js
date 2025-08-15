@@ -296,7 +296,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         await mediaItemContainer.evaluate((node, selector) => {
             return new Promise((resolve, reject) => {
                 const checkInterval = 1000; // Check every second
-                const timeout = 1200000; // 20 minutes timeout
+                const timeout = 2700000; // 45 minutes timeout
                 let elapsedTime = 0;
 
                 const intervalId = setInterval(() => {
