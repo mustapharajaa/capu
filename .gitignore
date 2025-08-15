@@ -17,6 +17,7 @@ yarn-error.log*
 !package*.json
 !editors.json.example
 !videos.json.example
+!*service-account.json.example
 
 # Downloaded executables and binaries
 bin/
