@@ -80,7 +80,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     '--disable-web-security', // Reduce security restrictions that might cause DOM issues
                     '--disable-features=VizDisplayCompositor' // Improve stability for concurrent tabs
                 ],
-                protocolTimeout: 1200000 // 20 minutes timeout for long video processing
+                protocolTimeout: 3000000 // 50 minutes timeout for long background removal processing
             };
 
             browser = await puppeteer.launch(launchOptions);
