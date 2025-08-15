@@ -95,37 +95,41 @@ if exist "%ProgramFiles%\nodejs\node.exe" (
 
 echo.
 echo Installing Node.js dependencies...
-
-REM Use the correct npm path
-if exist "%ProgramFiles%\nodejs\npm.cmd" (
-    call "%ProgramFiles%\nodejs\npm.cmd" install
-) else if exist "%ProgramFiles(x86)%\nodejs\npm.cmd" (
-    call "%ProgramFiles(x86)%\nodejs\npm.cmd" install
-) else (
-    call npm install
+call npm install
+if %errorlevel% neq 0 (
+    echo ERROR: npm install failed. Trying with full path...
+    if exist "%ProgramFiles%\nodejs\npm.cmd" (
+        call "%ProgramFiles%\nodejs\npm.cmd" install
+    ) else (
+        echo Please run manually: npm install
+        pause
+    )
 )
 
+echo.
 echo Installing FFmpeg npm package (fallback for setup)...
-
-REM Use the correct npm path
-if exist "%ProgramFiles%\nodejs\npm.cmd" (
-    call "%ProgramFiles%\nodejs\npm.cmd" install @ffmpeg-installer/ffmpeg
-) else if exist "%ProgramFiles(x86)%\nodejs\npm.cmd" (
-    call "%ProgramFiles(x86)%\nodejs\npm.cmd" install @ffmpeg-installer/ffmpeg
-) else (
-    call npm install @ffmpeg-installer/ffmpeg
+call npm install @ffmpeg-installer/ffmpeg
+if %errorlevel% neq 0 (
+    echo ERROR: FFmpeg install failed. Trying with full path...
+    if exist "%ProgramFiles%\nodejs\npm.cmd" (
+        call "%ProgramFiles%\nodejs\npm.cmd" install @ffmpeg-installer/ffmpeg
+    ) else (
+        echo Please run manually: npm install @ffmpeg-installer/ffmpeg
+        pause
+    )
 )
 
 echo.
 echo Running automated setup...
-
-REM Use the correct node path
-if exist "%ProgramFiles%\nodejs\node.exe" (
-    "%ProgramFiles%\nodejs\node.exe" setup.js
-) else if exist "%ProgramFiles(x86)%\nodejs\node.exe" (
-    "%ProgramFiles(x86)%\nodejs\node.exe" setup.js
-) else (
-    node setup.js
+node setup.js
+if %errorlevel% neq 0 (
+    echo ERROR: setup.js failed. Trying with full path...
+    if exist "%ProgramFiles%\nodejs\node.exe" (
+        "%ProgramFiles%\nodejs\node.exe" setup.js
+    ) else (
+        echo Please run manually: node setup.js
+        pause
+    )
 )
 
 echo.
