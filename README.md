@@ -2,30 +2,77 @@
 
 A comprehensive automation system for CapCut video processing with YouTube integration, background removal, and Google Sheets logging.
 
-## 🚀 One-Click Installation
+## 🚀 Installation Guide
 
-### Windows (Recommended)
-1. **Double-click `setup.bat`** - This will automatically:
-   - Install Node.js dependencies
-   - Download and configure FFmpeg
-   - Download and configure yt-dlp
-   - Update .env file with correct paths
-   - Set up all required components
+### Prerequisites
+Before installing, ensure you have:
+- **Node.js** (14.x or higher) - Download from [nodejs.org](https://nodejs.org/)
+- **Git** (optional, for cloning) - Download from [git-scm.com](https://git-scm.com/)
 
-2. **Run the application:**
+### Method 1: Download from GitHub (Recommended)
+1. **Download the repository:**
+   - Go to https://github.com/mustapharajaa/capu
+   - Click "Code" → "Download ZIP"
+   - Extract to your desired location (e.g., `C:\capu`)
+
+2. **Or clone with Git (if installed):**
+   ```cmd
+   git clone https://github.com/mustapharajaa/capu.git
+   cd capu
+   ```
+
+### Method 2: One-Click Installation
+1. **Navigate to the project folder:**
+   ```cmd
+   cd C:\path\to\capu
+   ```
+
+2. **Run the installer:**
+   ```cmd
+   setup.bat
+   ```
+   *This automatically installs all dependencies and configures paths*
+
+3. **Configure your settings:**
+   ```cmd
+   copy .env.example .env
+   copy editors.json.example editors.json
+   ```
+
+4. **Start the application:**
    ```cmd
    npm start
    ```
 
-3. **Open your browser:**
+5. **Open your browser:**
    - Navigate to `http://localhost:3000`
 
-### Manual Installation (if needed)
+### Method 3: Manual Installation (if setup.bat fails)
 ```cmd
 npm install
+npm install @ffmpeg-installer/ffmpeg
 node setup.js
 npm start
 ```
+
+### Troubleshooting Common Issues
+
+**"Git is not recognized":**
+- Download ZIP from GitHub instead of cloning
+- Or install Git from https://git-scm.com/
+
+**"The system cannot find the path specified":**
+- Use the correct path for your system
+- Check if the folder exists: `dir C:\path\to\capu`
+
+**"Node.js not found":**
+- Install Node.js from https://nodejs.org/
+- Restart command prompt after installation
+
+**Setup fails:**
+- Run as Administrator
+- Check internet connection for downloads
+- Use manual installation method
 
 ## 📋 Features
 
