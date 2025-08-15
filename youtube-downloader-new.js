@@ -64,7 +64,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
                 console.log(`Executing: ${YTDLP_BINARY_PATH} ${metadataArgs.join(' ')}`);
                 
                 const { execSync } = require('child_process');
-                const metadataOutput = execSync(`"${YTDLP_BINARY_PATH}" ${metadataArgs.join(' ')}`, { encoding: 'utf8' });
+                const metadataOutput = execSync(`"${YTDLP_BINARY_PATH}" --dump-json --cookies "${cookiesPath}" "${url}"`, { encoding: 'utf8' });
                 metadata = JSON.parse(metadataOutput);
             } else {
                 console.log('⚠️ No cookies file - metadata fetch may fail due to bot detection');
