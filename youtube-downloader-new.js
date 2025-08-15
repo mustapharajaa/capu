@@ -76,7 +76,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
             const outputFilename = `${sanitizedTitle}.mp4`;
             
             const outputPath = path.join(UPLOADS_DIR, outputFilename);
-            const infoJsonPath = path.join(UPLOADS_DIR, `${timestamp}_${sanitizedTitle}.info.json`);
+            const infoJsonPath = path.join(UPLOADS_DIR, `${sanitizedTitle}.info.json`);
 
             // Save the metadata we already fetched to the .info.json file
             fs.writeFileSync(infoJsonPath, JSON.stringify(metadata, null, 2));
@@ -102,6 +102,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
             
             ytdlpArgs.push(url);
 
+            console.log(`🔧 FFmpeg Path: ${FFMPEG_PATH}`);
             console.log(`Executing: ${YTDLP_BINARY_PATH} ${ytdlpArgs.join(' ')}`);
             if (progressCallback) progressCallback({ message: 'Starting download...' });
 
