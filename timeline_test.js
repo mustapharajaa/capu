@@ -334,6 +334,11 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         
         try {
             const uploadBadgeSelectors = [
+                // Your exact selectors from the HTML
+                '#workbench > div.lv-layout-sider.lv-layout-sider > div > div.layout-container.lv-theme-force_dark.smooth-width-transition > div > div > div > div.header-Kdaeiy > div.workspace-and-upload-list-section-XRnq32 > div.upload-task-icon-JXoMbD > span > span > span',
+                'xpath//*[@id="workbench"]/div[1]/div/div[2]/div/div/div/div[1]/div[1]/div[2]/span/span/span',
+                // Fallback selectors
+                '.upload-task-icon-JXoMbD span span span',
                 'span.lv-badge-number.badge-dwkIhr',
                 '.upload-task-icon-JXoMbD span.lv-badge-number',
                 'xpath//span[@class="lv-badge-number badge-dwkIhr badge-zoom-enter-done"]',
@@ -343,6 +348,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             let uploadBadgeFound = false;
             for (const selector of uploadBadgeSelectors) {
                 try {
+                    console.log(`🔍 Testing upload badge selector: ${selector}`);
                     let badgeElement;
                     if (selector.startsWith('xpath//')) {
                         const xpath = selector.replace('xpath//', '');
@@ -352,9 +358,12 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     }
                     
                     if (badgeElement) {
+                        // Get the badge text/content for debugging
+                        const badgeText = await badgeElement.evaluate(el => el.textContent || el.innerText || 'no text');
                         uploadBadgeFound = true;
                         console.log(`🔍 Found upload badge with selector: ${selector}`);
-                        if (progressCallback) progressCallback('⏳ Upload badge detected, waiting for completion...');
+                        console.log(`📊 Badge content: "${badgeText}"`);
+                        if (progressCallback) progressCallback(`⏳ Upload badge detected (${badgeText}), waiting for completion...`);
                         
                         // Wait for badge to disappear (up to 40 minutes)
                         console.log('⏳ Waiting for upload badge to disappear (up to 40 minutes)...');
@@ -376,9 +385,11 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         console.log('✅ Upload badge disappeared - upload fully complete!');
                         if (progressCallback) progressCallback('✅ Upload badge cleared - ready for timeline!');
                         break;
+                    } else {
+                        console.log(`❌ Upload badge NOT found with selector: ${selector}`);
                     }
                 } catch (e) {
-                    // Badge not found with this selector, try next
+                    console.log(`⚠️ Upload badge selector failed: ${selector} - ${e.message}`);
                 }
             }
             
