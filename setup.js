@@ -110,22 +110,16 @@ async function setupWindows() {
             console.log('✅ yt-dlp already exists');
         }
         
-        // Download FFmpeg directly
+        // Download FFmpeg
         if (!fs.existsSync(ffmpegPath)) {
-            console.log('📥 Downloading FFmpeg for Windows...');
+            console.log('📥 Downloading FFmpeg...');
             const ffmpegZipPath = path.join(binDir, 'ffmpeg.zip');
             
             try {
-                // Download FFmpeg essentials build
                 await downloadFile('https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip', ffmpegZipPath);
                 
                 console.log('📦 Extracting FFmpeg...');
-                const tempExtractDir = path.join(binDir, 'temp_ffmpeg');
-                
-                // Extract zip file
-                if (extractZip(ffmpegZipPath, tempExtractDir)) {
-                    console.log('✅ FFmpeg extracted successfully');
-                    
+                if (extractZip(ffmpegZipPath, binDir)) {
                     // Find the ffmpeg.exe in the extracted folder structure
                     const findFFmpegExe = (dir) => {
                         const items = fs.readdirSync(dir);
@@ -141,97 +135,53 @@ async function setupWindows() {
                         return null;
                     };
                     
-                    const ffmpegExePath = findFFmpegExe(tempExtractDir);
-                    if (ffmpegExePath) {
-                        // Create ffmpeg directory and copy executable
+                    const foundFFmpegPath = findFFmpegExe(binDir);
+                    if (foundFFmpegPath) {
+                        // Create ffmpeg directory and copy the exe
                         if (!fs.existsSync(ffmpegDir)) {
                             fs.mkdirSync(ffmpegDir, { recursive: true });
                         }
-                        fs.copyFileSync(ffmpegExePath, ffmpegPath);
-                        console.log('✅ FFmpeg installed successfully');
+                        fs.copyFileSync(foundFFmpegPath, ffmpegPath);
+                        console.log('✅ FFmpeg extracted and configured');
+                        
+                        // Clean up extracted folders (keep only the exe)
+                        const extractedDirs = fs.readdirSync(binDir).filter(item => {
+                            const fullPath = path.join(binDir, item);
+                            return fs.statSync(fullPath).isDirectory() && item.startsWith('ffmpeg-');
+                        });
+                        
+                        for (const dir of extractedDirs) {
+                            fs.rmSync(path.join(binDir, dir), { recursive: true, force: true });
+                        }
                     } else {
                         throw new Error('Could not find ffmpeg.exe in extracted files');
                     }
                 } else {
-                    throw new Error('Failed to extract FFmpeg zip file');
+                    throw new Error('Failed to extract FFmpeg zip');
                 }
                 
-                // Clean up
-                if (fs.existsSync(tempExtractDir)) {
-                    fs.rmSync(tempExtractDir, { recursive: true, force: true });
-                }
-                if (fs.existsSync(ffmpegZipPath)) {
-                    fs.unlinkSync(ffmpegZipPath);
-                }
+                // Clean up zip file
+                fs.unlinkSync(ffmpegZipPath);
+                
             } catch (error) {
-                console.log('⚠️  FFmpeg download failed, using npm package fallback');
-                console.log('   Using @ffmpeg-installer/ffmpeg package instead');
-                
-                // Try to use npm FFmpeg package
+                console.log('⚠️  FFmpeg download/extraction failed, trying npm package...');
                 try {
-                    const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
-                    if (ffmpegInstaller.path) {
-                        console.log('✅ Using npm FFmpeg package');
-                    } else {
-                        console.log('⚠️  npm FFmpeg package not found, will use fallback path in .env');
-                    }
+                    execSync('npm install @ffmpeg-installer/ffmpeg', { stdio: 'inherit' });
+                    console.log('✅ FFmpeg npm package installed as fallback');
                 } catch (npmError) {
-                    console.log('⚠️  npm FFmpeg package not available');
+                    console.error('❌ Both FFmpeg download and npm install failed');
+                    throw error;
                 }
             }
         } else {
             console.log('✅ FFmpeg already exists');
         }
         
-        // Read existing .env file to preserve other settings
-        let existingEnvContent = '';
-        if (fs.existsSync(envPath)) {
-            existingEnvContent = fs.readFileSync(envPath, 'utf8');
-        }
-        
-        // Update or add FFmpeg and yt-dlp paths
-        let envLines = existingEnvContent.split('\n');
-        
-        // Remove existing YTDLP_PATH and FFMPEG_PATH lines
-        envLines = envLines.filter(line => 
-            !line.startsWith('YTDLP_PATH=') && 
-            !line.startsWith('FFMPEG_PATH=')
-        );
-        
-        // Add updated paths
-        envLines.push(`YTDLP_PATH=${ytdlpPath.replace(/\\/g, '\\\\')}`);
-        
-        // Use npm FFmpeg package path if direct download failed
-        if (fs.existsSync(ffmpegPath)) {
-            envLines.push(`FFMPEG_PATH=${ffmpegPath.replace(/\\/g, '\\\\')}`);
-        } else {
-            try {
-                const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
-                if (ffmpegInstaller.path) {
-                    envLines.push(`FFMPEG_PATH=${ffmpegInstaller.path.replace(/\\/g, '\\\\')}`);
-                    console.log('✅ Using npm FFmpeg package path in .env');
-                }
-            } catch (npmError) {
-                envLines.push('# FFMPEG_PATH=C:\\\\path\\\\to\\\\ffmpeg.exe');
-                console.log('⚠️  Please manually set FFMPEG_PATH in .env file');
-            }
-        }
-        
-        // Add default settings if they don't exist
-        if (!existingEnvContent.includes('DOWNLOAD_QUALITY=')) {
-            envLines.push('DOWNLOAD_QUALITY=bestvideo[height<=1080]+bestaudio');
-        }
-        if (!existingEnvContent.includes('DOWNLOAD_FORMAT=')) {
-            envLines.push('DOWNLOAD_FORMAT=bestvideo[height<=1080]+bestaudio/best[height<=1080]');
-        }
-        
-        // Write updated .env file
-        const finalEnvContent = envLines.filter(line => line.trim() !== '').join('\n') + '\n';
-        fs.writeFileSync(envPath, finalEnvContent);
-        console.log('✅ Updated .env file with FFmpeg and yt-dlp paths');
+        // Update .env file with paths
+        updateEnvFile(ytdlpPath, ffmpegPath);
         
     } catch (error) {
-        console.error('❌ Setup failed:', error.message);
+        console.error('❌ Windows setup failed:', error.message);
         process.exit(1);
     }
 }
@@ -262,42 +212,41 @@ async function setupLinux() {
             console.log('⚠️  Could not install FFmpeg. Please install manually: sudo apt install ffmpeg');
         }
         
-        // Read existing .env file to preserve other settings
-        let existingEnvContent = '';
-        if (fs.existsSync(envPath)) {
-            existingEnvContent = fs.readFileSync(envPath, 'utf8');
-        }
-        
-        // Update or add FFmpeg and yt-dlp paths
-        let envLines = existingEnvContent.split('\n');
-        
-        // Remove existing YTDLP_PATH and FFMPEG_PATH lines
-        envLines = envLines.filter(line => 
-            !line.startsWith('YTDLP_PATH=') && 
-            !line.startsWith('FFMPEG_PATH=')
-        );
-        
-        // Add updated paths
-        envLines.push('YTDLP_PATH=/usr/local/bin/yt-dlp');
-        envLines.push('FFMPEG_PATH=/usr/bin/ffmpeg');
-        
-        // Add default settings if they don't exist
-        if (!existingEnvContent.includes('DOWNLOAD_QUALITY=')) {
-            envLines.push('DOWNLOAD_QUALITY=bestvideo[height<=1080]+bestaudio');
-        }
-        if (!existingEnvContent.includes('DOWNLOAD_FORMAT=')) {
-            envLines.push('DOWNLOAD_FORMAT=bestvideo[height<=1080]+bestaudio/best[height<=1080]');
-        }
-        
-        // Write updated .env file
-        const finalEnvContent = envLines.filter(line => line.trim() !== '').join('\n') + '\n';
-        fs.writeFileSync(envPath, finalEnvContent);
-        console.log('✅ Updated .env file with FFmpeg and yt-dlp paths');
+        // Update .env file with paths
+        updateEnvFile('/usr/local/bin/yt-dlp', '/usr/bin/ffmpeg');
         
     } catch (error) {
-        console.error('❌ Setup failed:', error.message);
+        console.error('❌ Linux setup failed:', error.message);
         process.exit(1);
     }
+}
+
+function updateEnvFile(ytdlpPath, ffmpegPath) {
+    console.log('📝 Updating .env file...');
+    
+    // Read existing .env file to preserve other settings
+    let existingEnvContent = '';
+    if (fs.existsSync(envPath)) {
+        existingEnvContent = fs.readFileSync(envPath, 'utf8');
+    }
+    
+    // Update or add FFmpeg and yt-dlp paths
+    let envLines = existingEnvContent.split('\n');
+    
+    // Remove existing YTDLP_PATH and FFMPEG_PATH lines
+    envLines = envLines.filter(line => 
+        !line.startsWith('YTDLP_PATH=') && 
+        !line.startsWith('FFMPEG_PATH=')
+    );
+    
+    // Add updated paths
+    envLines.push(`YTDLP_PATH=${ytdlpPath}`);
+    envLines.push(`FFMPEG_PATH=${ffmpegPath}`);
+    
+    // Write updated .env file
+    const finalEnvContent = envLines.filter(line => line.trim() !== '').join('\n') + '\n';
+    fs.writeFileSync(envPath, finalEnvContent);
+    console.log('✅ Updated .env file with FFmpeg and yt-dlp paths');
 }
 
 async function main() {
@@ -357,16 +306,6 @@ async function main() {
             }
         }
         
-        // Check if required example files exist for configuration
-        const requiredFiles = ['.env.example', 'editors.json.example', 'new videos.example'];
-        for (const file of requiredFiles) {
-            if (fs.existsSync(path.join(__dirname, file))) {
-                console.log(`✅ ${file} found`);
-            } else {
-                console.log(`⚠️  ${file} missing (needed for configuration)`);
-            }
-        }
-        
         if (setupValid) {
             console.log('\n🎉 Setup completed successfully!');
         } else {
@@ -378,8 +317,7 @@ async function main() {
         console.log('   2. Open http://localhost:3000');
         console.log('\n💡 Configuration:');
         console.log('   - FFmpeg and yt-dlp paths updated in .env');
-        console.log('   - Google Sheets integration ready (configure in .env if needed)');
-        console.log('   - Batch processing enabled');
+        console.log('   - Download format handled automatically by yt-dlp');
         console.log('\n📁 Files created:');
         console.log('   - bin/yt-dlp.exe (Windows) or yt-dlp (Linux)');
         console.log('   - bin/ffmpeg/ffmpeg.exe (Windows) or system FFmpeg (Linux)');
