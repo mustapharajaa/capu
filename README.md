@@ -2,58 +2,48 @@
 
 A comprehensive automation system for CapCut video processing with YouTube integration, background removal, and Google Sheets logging.
 
-## 🚀 Installation Guide
+## 🚀 Super Simple Installation
 
-### Prerequisites
-Before installing, ensure you have:
-- **Node.js** (14.x or higher) - Download from [nodejs.org](https://nodejs.org/)
-- **Git** (optional, for cloning) - Download from [git-scm.com](https://git-scm.com/)
+### **Step 1: Download**
+- Go to https://github.com/mustapharajaa/capu
+- Click **"Code"** → **"Download ZIP"**
+- Extract anywhere (e.g., `C:\capu`)
 
-### Method 1: Download from GitHub (Recommended)
-1. **Download the repository:**
-   - Go to https://github.com/mustapharajaa/capu
-   - Click "Code" → "Download ZIP"
-   - Extract to your desired location (e.g., `C:\capu`)
+### **Step 2: One-Click Install**
+**For Command Prompt:**
+```cmd
+cd C:\capu
+setup.bat
+```
 
-2. **Or clone with Git (if installed):**
-   ```cmd
-   git clone https://github.com/mustapharajaa/capu.git
-   cd capu
-   ```
+**For PowerShell:**
+```powershell
+cd C:\capu
+.\setup.bat
+```
 
-### Method 2: One-Click Installation
-1. **Navigate to the project folder:**
-   ```cmd
-   cd C:\path\to\capu
-   ```
+**That's it!** The installer automatically:
+- ✅ Downloads and installs Node.js (if needed)
+- ✅ Downloads FFmpeg and yt-dlp
+- ✅ Installs all dependencies
+- ✅ Creates configuration files
+- ✅ Sets up everything for you
 
-2. **Run the installer:**
-   ```cmd
-   setup.bat
-   ```
-   *This automatically installs all dependencies and configures paths*
+### **Step 3: Configure & Run**
+After setup completes:
+1. **Edit your settings** (optional):
+   - `.env` - Add Google Sheets credentials
+   - `editors.json` - Add CapCut editor URLs
 
-3. **Configure your settings:**
-   ```cmd
-   copy .env.example .env
-   copy editors.json.example editors.json
-   ```
-
-4. **Start the application:**
+2. **Start the app:**
    ```cmd
    npm start
    ```
 
-5. **Open your browser:**
-   - Navigate to `http://localhost:3000`
+3. **Open browser:** http://localhost:3000
 
-### Method 3: Manual Installation (if setup.bat fails)
-```cmd
-npm install
-npm install @ffmpeg-installer/ffmpeg
-node setup.js
-npm start
-```
+## **That's All! 🎉**
+Two steps: Download → Run setup.bat
 
 ### Troubleshooting Common Issues
 

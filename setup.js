@@ -30,15 +30,24 @@ if (!fs.existsSync(binDir)) {
     console.log('📁 Created bin directory');
 }
 
-async function downloadFile(url, outputPath) {
+async function downloadFile(url, outputPath, retries = 3) {
     return new Promise((resolve, reject) => {
-        console.log(`📥 Downloading ${path.basename(outputPath)}...`);
+        console.log(`📥 Downloading ${path.basename(outputPath)}... (${4 - retries}/3 attempts)`);
         const file = fs.createWriteStream(outputPath);
         
-        https.get(url, (response) => {
+        const request = https.get(url, (response) => {
             if (response.statusCode === 302 || response.statusCode === 301) {
                 // Handle redirects
-                return downloadFile(response.headers.location, outputPath).then(resolve).catch(reject);
+                file.close();
+                fs.unlink(outputPath, () => {}); // Delete partial file
+                return downloadFile(response.headers.location, outputPath, retries).then(resolve).catch(reject);
+            }
+            
+            if (response.statusCode !== 200) {
+                file.close();
+                fs.unlink(outputPath, () => {}); // Delete partial file
+                reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
+                return;
             }
             
             response.pipe(file);
@@ -47,9 +56,41 @@ async function downloadFile(url, outputPath) {
                 console.log(`✅ Downloaded ${path.basename(outputPath)}`);
                 resolve();
             });
-        }).on('error', (err) => {
+            
+            file.on('error', (err) => {
+                file.close();
+                fs.unlink(outputPath, () => {}); // Delete partial file
+                reject(err);
+            });
+        });
+        
+        request.on('error', (err) => {
+            file.close();
             fs.unlink(outputPath, () => {}); // Delete partial file
-            reject(err);
+            
+            if (retries > 0) {
+                console.log(`⚠️  Download failed: ${err.message}. Retrying... (${retries} attempts left)`);
+                setTimeout(() => {
+                    downloadFile(url, outputPath, retries - 1).then(resolve).catch(reject);
+                }, 2000); // Wait 2 seconds before retry
+            } else {
+                reject(err);
+            }
+        });
+        
+        request.setTimeout(30000, () => {
+            request.destroy();
+            file.close();
+            fs.unlink(outputPath, () => {}); // Delete partial file
+            
+            if (retries > 0) {
+                console.log(`⚠️  Download timeout. Retrying... (${retries} attempts left)`);
+                setTimeout(() => {
+                    downloadFile(url, outputPath, retries - 1).then(resolve).catch(reject);
+                }, 2000);
+            } else {
+                reject(new Error('Download timeout after multiple attempts'));
+            }
         });
     });
 }
@@ -267,8 +308,72 @@ async function main() {
             await setupLinux();
         }
         
-        console.log('\n🎉 Setup completed successfully!');
-        console.log('📋 Next steps:');
+        // Verify setup completion
+        console.log('\n🔍 Verifying setup...');
+        
+        let setupValid = true;
+        
+        // Check if .env file exists and has required paths
+        if (fs.existsSync(envPath)) {
+            const envContent = fs.readFileSync(envPath, 'utf8');
+            if (envContent.includes('YTDLP_PATH=') && envContent.includes('FFMPEG_PATH=')) {
+                console.log('✅ .env file configured with paths');
+            } else {
+                console.log('⚠️  .env file missing required paths');
+                setupValid = false;
+            }
+        } else {
+            console.log('❌ .env file not found');
+            setupValid = false;
+        }
+        
+        // Check if binaries exist or npm packages are available
+        if (isWindows) {
+            const ytdlpPath = path.join(binDir, 'yt-dlp.exe');
+            const ffmpegPath = path.join(binDir, 'ffmpeg', 'ffmpeg.exe');
+            
+            if (fs.existsSync(ytdlpPath)) {
+                console.log('✅ yt-dlp.exe found');
+            } else {
+                console.log('❌ yt-dlp.exe not found');
+                setupValid = false;
+            }
+            
+            if (fs.existsSync(ffmpegPath)) {
+                console.log('✅ FFmpeg binary found');
+            } else {
+                try {
+                    const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+                    if (ffmpegInstaller.path) {
+                        console.log('✅ FFmpeg npm package available');
+                    } else {
+                        console.log('⚠️  FFmpeg not found (binary or npm package)');
+                        setupValid = false;
+                    }
+                } catch (npmError) {
+                    console.log('⚠️  FFmpeg not found (binary or npm package)');
+                    setupValid = false;
+                }
+            }
+        }
+        
+        // Check if required example files exist for configuration
+        const requiredFiles = ['.env.example', 'editors.json.example', 'new videos.example'];
+        for (const file of requiredFiles) {
+            if (fs.existsSync(path.join(__dirname, file))) {
+                console.log(`✅ ${file} found`);
+            } else {
+                console.log(`⚠️  ${file} missing (needed for configuration)`);
+            }
+        }
+        
+        if (setupValid) {
+            console.log('\n🎉 Setup completed successfully!');
+        } else {
+            console.log('\n⚠️  Setup completed with warnings - some components may not work properly');
+        }
+        
+        console.log('\n📋 Next steps:');
         console.log('   1. Run: npm start');
         console.log('   2. Open http://localhost:3000');
         console.log('\n💡 Configuration:');

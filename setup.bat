@@ -95,7 +95,9 @@ if exist "%ProgramFiles%\nodejs\node.exe" (
 
 echo.
 echo Installing Node.js dependencies...
+echo DEBUG: About to run npm install...
 call npm install
+echo DEBUG: npm install completed with exit code: %errorlevel%
 if %errorlevel% neq 0 (
     echo ERROR: npm install failed. Trying with full path...
     if exist "%ProgramFiles%\nodejs\npm.cmd" (
@@ -134,9 +136,42 @@ if %errorlevel% neq 0 (
 
 echo.
 echo Creating configuration files...
-if not exist ".env" copy ".env.example" ".env" >nul 2>&1
-if not exist "editors.json" copy "editors.json.example" "editors.json" >nul 2>&1
-if not exist "new videos" copy "new videos.example" "new videos" >nul 2>&1
+
+REM Validate and create .env file
+if not exist ".env" (
+    if exist ".env.example" (
+        copy ".env.example" ".env" >nul 2>&1
+        echo   - .env created from .env.example
+    ) else (
+        echo   - WARNING: .env.example not found, cannot create .env
+    )
+) else (
+    echo   - .env already exists
+)
+
+REM Validate and create editors.json file
+if not exist "editors.json" (
+    if exist "editors.json.example" (
+        copy "editors.json.example" "editors.json" >nul 2>&1
+        echo   - editors.json created from editors.json.example
+    ) else (
+        echo   - WARNING: editors.json.example not found, cannot create editors.json
+    )
+) else (
+    echo   - editors.json already exists
+)
+
+REM Validate and create new videos file
+if not exist "new videos" (
+    if exist "new videos.example" (
+        copy "new videos.example" "new videos" >nul 2>&1
+        echo   - 'new videos' file created from example
+    ) else (
+        echo   - WARNING: 'new videos.example' not found, cannot create 'new videos'
+    )
+) else (
+    echo   - 'new videos' file already exists
+)
 
 echo.
 echo ========================================
