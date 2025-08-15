@@ -179,8 +179,18 @@ class BatchProcessor {
 
                 console.log(`📋 Found ${urls.length} URLs in queue, ${availableEditorsCount} editors available`);
                 
-                // Determine how many videos to process concurrently
-                const concurrentCount = Math.min(urls.length, availableEditorsCount);
+                // Determine how many videos to process concurrently (maximum 3)
+                const maxConcurrent = 3; // Maximum 3 automations at once
+                const concurrentCount = Math.min(urls.length, availableEditorsCount, maxConcurrent);
+                
+                // Log automation limit enforcement
+                if (urls.length > maxConcurrent && availableEditorsCount > maxConcurrent) {
+                    console.log(`🔒 Automation limit enforced: Processing ${maxConcurrent} videos (${urls.length - maxConcurrent} queued for next batch)`);
+                } else if (availableEditorsCount > maxConcurrent) {
+                    console.log(`🔒 Automation limit enforced: Processing ${concurrentCount} videos (limited by queue size)`);
+                } else if (urls.length > maxConcurrent) {
+                    console.log(`🔒 Automation limit enforced: Processing ${concurrentCount} videos (limited by available editors)`);
+                }
                 
                 if (concurrentCount > 1) {
                     console.log(`🚀 Starting ${concurrentCount} concurrent automations with 20-second delays...`);
@@ -274,3 +284,4 @@ class BatchProcessor {
 }
 
 module.exports = BatchProcessor;
+
