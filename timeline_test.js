@@ -80,7 +80,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     '--disable-web-security', // Reduce security restrictions that might cause DOM issues
                     '--disable-features=VizDisplayCompositor' // Improve stability for concurrent tabs
                 ],
-                protocolTimeout: 3000000 // 50 minutes timeout for long background removal processing
+                protocolTimeout: 18000000 // 300 minutes timeout for long background removal processing
             };
 
             browser = await puppeteer.launch(launchOptions);
@@ -817,7 +817,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 if (progressCallback) progressCallback('✅ Remove Background switch activated!');
                 
                 // Monitor for background removal completion with retry logic
-                console.log('⏳ Monitoring background removal for up to 50 minutes...');
+                console.log('⏳ Monitoring background removal for up to 300 minutes...');
                 if (progressCallback) progressCallback('⏳ Monitoring background removal progress...');
                 
                 let retryCount = 0;
@@ -899,7 +899,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                             }
                             
                             return false; // Continue waiting
-                        }, { timeout: 50 * 60 * 1000, polling: 5000 }); // 50 minutes timeout, check every 5 seconds
+                        }, { timeout: 300 * 60 * 1000, polling: 5000 }); // 300 minutes timeout, check every 5 seconds
 
                         const resultValue = await result.jsonValue();
                         
