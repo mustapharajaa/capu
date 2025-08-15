@@ -26,18 +26,29 @@ if %errorlevel% neq 0 (
         echo Waiting for Node.js installation to complete...
         timeout /t 30 /nobreak >nul
         
-        REM Refresh environment variables
+        REM Refresh environment variables and PATH
         call refreshenv >nul 2>&1
         
-        REM Add Node.js to PATH for current session
-        set "PATH=%PATH%;%ProgramFiles%\nodejs"
+        REM Add Node.js to PATH for current session (multiple possible locations)
+        set "PATH=%PATH%;%ProgramFiles%\nodejs;%APPDATA%\npm"
+        
+        REM Wait a bit more for installation to fully complete
+        timeout /t 10 /nobreak >nul
         
         echo Node.js installation completed!
+        echo.
+        echo IMPORTANT: Node.js has been installed successfully!
+        echo Please close this window and run setup.bat again to continue.
+        echo.
+        echo Next: Close this window, then run: .\setup.bat
         echo.
         
         REM Clean up
         del "%temp%\capcut-setup\nodejs.msi" >nul 2>&1
         rmdir "%temp%\capcut-setup" >nul 2>&1
+        
+        pause
+        exit /b 0
     ) else (
         echo Failed to download Node.js installer.
         echo Please install Node.js manually from https://nodejs.org/
