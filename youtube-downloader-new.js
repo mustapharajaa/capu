@@ -53,9 +53,19 @@ async function downloadYouTubeVideo(url, progressCallback) {
             console.log('Fetching video metadata...');
             let metadata;
             
+            // Use spawn to get metadata with cookies (like reference app)
             if (fs.existsSync(cookiesPath)) {
-                console.log('✅ Using cookies for metadata fetch');
-                metadata = await ytDlpWrap.getVideoInfo(url, ['--cookies', cookiesPath]);
+                console.log('🍪 Using YouTube cookies for authentication');
+                const metadataArgs = [
+                    '--dump-json',
+                    '--cookies', cookiesPath,
+                    url
+                ];
+                console.log(`Executing: ${YTDLP_BINARY_PATH} ${metadataArgs.join(' ')}`);
+                
+                const { execSync } = require('child_process');
+                const metadataOutput = execSync(`"${YTDLP_BINARY_PATH}" ${metadataArgs.join(' ')}`, { encoding: 'utf8' });
+                metadata = JSON.parse(metadataOutput);
             } else {
                 console.log('⚠️ No cookies file - metadata fetch may fail due to bot detection');
                 metadata = await ytDlpWrap.getVideoInfo(url);
@@ -70,25 +80,24 @@ async function downloadYouTubeVideo(url, progressCallback) {
             fs.writeFileSync(infoJsonPath, JSON.stringify(metadata, null, 2));
             console.log(`Saved .info.json to ${infoJsonPath}`);
 
-            // Check for cookies file and add to arguments if present
+            // Use EXACT same format as reference app
             const ytdlpArgs = [
                 '--format', 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
                 '--output', outputPath,
                 '--no-playlist',
-                '--merge-output-format', 'mp4'
+                '--write-info-json'
             ];
             
-            // Add cookies if file exists
+            // Add cookies if file exists (EXACTLY like reference app)
             if (fs.existsSync(cookiesPath)) {
                 ytdlpArgs.push('--cookies', cookiesPath);
-                console.log('✅ Using YouTube cookies for authentication');
             } else {
                 console.log('⚠️ No cookies file found - downloads may be limited by bot detection');
             }
             
             ytdlpArgs.push(url);
 
-            console.log(`Starting download: yt-dlp ${ytdlpArgs.join(' ')}`);
+            console.log(`Executing: ${YTDLP_BINARY_PATH} ${ytdlpArgs.join(' ')}`);
             if (progressCallback) progressCallback({ message: 'Starting download...' });
 
             ytDlpWrap.exec(ytdlpArgs)
