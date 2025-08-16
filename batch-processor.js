@@ -128,7 +128,7 @@ class BatchProcessor {
     }
 
     /**
-     * Get available editors count
+     * Get available editors count (editors that are not currently running)
      */
     getAvailableEditorsCount() {
         try {
@@ -137,7 +137,7 @@ class BatchProcessor {
             }
 
             const editors = JSON.parse(fs.readFileSync(this.editorsFile, 'utf8'));
-            const availableEditors = editors.filter(editor => editor.status === 'available');
+            const availableEditors = editors.filter(editor => editor.result !== 'running');
             return availableEditors.length;
         } catch (error) {
             console.error('❌ Error getting available editors count:', error.message);
@@ -284,4 +284,3 @@ class BatchProcessor {
 }
 
 module.exports = BatchProcessor;
-
