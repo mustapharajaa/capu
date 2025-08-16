@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { exec } = require('child_process');
 const { downloadYouTubeVideo, getVideoInfo } = require('./youtube-downloader-new');
 const BatchProcessor = require('./batch-processor');
 const { runSimpleUpload } = require('./timeline_test');
@@ -9,6 +10,23 @@ require('dotenv').config();
 
 // Initialize batch processor
 const batchProcessor = new BatchProcessor();
+
+// Function to count currently running automations
+function getRunningAutomationsCount() {
+    try {
+        const editorsFile = path.join(__dirname, 'editors.json');
+        if (!fs.existsSync(editorsFile)) {
+            return 0;
+        }
+
+        const editors = JSON.parse(fs.readFileSync(editorsFile, 'utf8'));
+        const runningAutomations = editors.filter(editor => editor.result === 'running');
+        return runningAutomations.length;
+    } catch (error) {
+        console.error('❌ Error counting running automations:', error.message);
+        return 0;
+    }
+}
 
 // Auto-start batch processor on server startup (if enabled in .env)
 setTimeout(() => {
@@ -88,6 +106,30 @@ app.post('/upload', upload.single('video'), async (req, res) => {
 
     try {
         console.log('📼 Starting CapCut automation for local upload...');
+        
+        // Check concurrent automation limit (maximum 3 with shared browser)
+        const maxConcurrent = 3;
+        const runningCount = getRunningAutomationsCount();
+        
+        if (runningCount >= maxConcurrent) {
+            console.log(`🔒 Automation limit reached: ${runningCount}/${maxConcurrent} automations running`);
+            console.log('❌ Local upload blocked - too many concurrent automations');
+            
+            // Delete the uploaded file since automation cannot proceed
+            if (fs.existsSync(absoluteFilePath)) {
+                fs.unlinkSync(absoluteFilePath);
+                console.log(`🗑️ Deleted uploaded file: ${path.basename(absoluteFilePath)}`);
+            }
+            
+            return res.status(429).json({
+                success: false,
+                message: `Too many concurrent automations (${runningCount}/${maxConcurrent}). Please wait for an automation to complete before uploading.`,
+                runningCount: runningCount,
+                maxConcurrent: maxConcurrent
+            });
+        }
+        
+        console.log(`🚀 Starting automation (${runningCount + 1}/${maxConcurrent} slots used)`);
         
         // Start CapCut automation with the uploaded file
         await runSimpleUpload(absoluteFilePath, (message) => {
@@ -338,8 +380,105 @@ const server = app.listen(port, () => {
 });
 
 // --- Graceful Shutdown ---
+async function cleanupBrowser() {
+    console.log('🧹 Cleaning up browser instances...');
+    return new Promise((resolve) => {
+        // Command to find the process using port 9222 on Windows
+        const command = 'netstat -aon | findstr :9222';
+        exec(command, (err, stdout, stderr) => {
+            if (err || !stdout) {
+                // This is expected if no process is listening on the port
+                console.log('✅ No browser process found on port 9222.');
+                return resolve();
+            }
+
+            const lines = stdout.trim().split('\n');
+            const pids = new Set();
+
+            lines.forEach(line => {
+                const parts = line.trim().split(/\s+/);
+                const pid = parts[parts.length - 1];
+                if (pid && pid !== '0' && /LISTENING|ESTABLISHED/.test(line)) {
+                    pids.add(pid);
+                }
+            });
+
+            if (pids.size === 0) {
+                console.log('✅ No active browser process found to kill.');
+                return resolve();
+            }
+
+            let killedCount = 0;
+            pids.forEach(pid => {
+                console.log(`🔪 Terminating browser process with PID: ${pid}`);
+                // Forcefully kill the process by PID
+                exec(`taskkill /PID ${pid} /F`, (killErr, killStdout, killStderr) => {
+                    if (killErr) {
+                        console.error(`❌ Failed to kill process ${pid}:`, killStderr);
+                    } else {
+                        console.log(`👍 Successfully terminated process ${pid}.`);
+                    }
+                    killedCount++;
+                    if (killedCount === pids.size) {
+                        resolve();
+                    }
+                });
+            });
+        });
+    });
+}
+
+async function cleanupBrowser() {
+    console.log('🧹 Cleaning up browser instances...');
+    return new Promise((resolve) => {
+        // Command to find the process using port 9222 on Windows
+        const command = 'netstat -aon | findstr :9222';
+        exec(command, (err, stdout, stderr) => {
+            if (err || !stdout) {
+                // This is expected if no process is listening on the port
+                console.log('✅ No browser process found on port 9222.');
+                return resolve();
+            }
+
+            const lines = stdout.trim().split('\n');
+            const pids = new Set();
+
+            lines.forEach(line => {
+                const parts = line.trim().split(/\s+/);
+                const pid = parts[parts.length - 1];
+                if (pid && pid !== '0' && /LISTENING|ESTABLISHED/.test(line)) {
+                    pids.add(pid);
+                }
+            });
+
+            if (pids.size === 0) {
+                console.log('✅ No active browser process found to kill.');
+                return resolve();
+            }
+
+            let killedCount = 0;
+            pids.forEach(pid => {
+                console.log(`🔪 Terminating browser process with PID: ${pid}`);
+                // Forcefully kill the process by PID
+                exec(`taskkill /PID ${pid} /F`, (killErr, killStdout, killStderr) => {
+                    if (killErr) {
+                        console.error(`❌ Failed to kill process ${pid}:`, killStderr);
+                    } else {
+                        console.log(`👍 Successfully terminated process ${pid}.`);
+                    }
+                    killedCount++;
+                    if (killedCount === pids.size) {
+                        resolve();
+                    }
+                });
+            });
+        });
+    });
+}
+
 async function gracefulShutdown() {
     console.log('\nShutting down gracefully...');
+    await cleanupBrowser(); // Ensure browser is closed
     server.close(() => {
         console.log('Server has been shut down.');
         process.exit(0);

@@ -6,14 +6,17 @@ A comprehensive automation system for CapCut video processing with YouTube integ
 
 download folder    https://github.com/mustapharajaa/capu
 ```cmd
-setup.bat
+in terminal not shell RUN THIS COMMANDS 
+
+.\setup.bat
 npm cache clean --force
 npm install
 node setup.js
 add your .env.exemple details to .env paths it auto update
 edite editors.json and new videos file
-edite youtube-cookies 
-npm start
+edite youtube-cookies.txt 
+edite google sheet key file  capcut-sheet-service-account.json
+npm run start
 ```
 
 Open: http://localhost:3000

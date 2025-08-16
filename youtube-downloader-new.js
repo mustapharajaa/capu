@@ -72,9 +72,11 @@ async function downloadYouTubeVideo(url, progressCallback) {
             }
             const sanitizedTitle = sanitizeFilename(metadata.title);
 
-            const outputFilename = `${timestamp}_${sanitizedTitle}.mp4`;
+            // No timestamp - clean filename as requested
+            const outputFilename = `${sanitizedTitle}.mp4`;
+            
             const outputPath = path.join(UPLOADS_DIR, outputFilename);
-            const infoJsonPath = path.join(UPLOADS_DIR, `${timestamp}_${sanitizedTitle}.info.json`);
+            const infoJsonPath = path.join(UPLOADS_DIR, `${sanitizedTitle}.info.json`);
 
             // Save the metadata we already fetched to the .info.json file
             fs.writeFileSync(infoJsonPath, JSON.stringify(metadata, null, 2));
@@ -85,7 +87,10 @@ async function downloadYouTubeVideo(url, progressCallback) {
                 '--format', 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
                 '--output', outputPath,
                 '--no-playlist',
-                '--write-info-json'
+                '--write-info-json',
+                '--ffmpeg-location', FFMPEG_PATH,
+                '--merge-output-format', 'mp4',
+                '--postprocessor-args', 'ffmpeg:-c:v copy -c:a aac -strict -2'
             ];
             
             // Add cookies if file exists (EXACTLY like reference app)
@@ -97,6 +102,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
             
             ytdlpArgs.push(url);
 
+            console.log(`🔧 FFmpeg Path: ${FFMPEG_PATH}`);
             console.log(`Executing: ${YTDLP_BINARY_PATH} ${ytdlpArgs.join(' ')}`);
             if (progressCallback) progressCallback({ message: 'Starting download...' });
 
@@ -130,112 +136,6 @@ async function downloadYouTubeVideo(url, progressCallback) {
     });
 }
 
-async function downloadWithFFmpegMerge(url, outputPath, progressCallback) {
-    return new Promise((resolve, reject) => {
-        console.log('🔥 Starting REAL-TIME yt-dlp → FFmpeg pipeline...');
-        
-        // yt-dlp command to output merged video+audio stream to stdout
-        const ytdlpArgs = [
-            '--format', 'best[height<=1080]/bestvideo[height<=1080]+bestaudio/best',
-            '--output', '-',  // Output to stdout
-            '--no-playlist',
-            '--merge-output-format', 'mp4'
-        ];
-
-        // Add cookies if available
-        if (cookiesExist) {
-            ytdlpArgs.push('--cookies', COOKIES_PATH);
-            console.log('🍪 Using YouTube cookies for authentication');
-        }
-
-        ytdlpArgs.push(url);
-
-        // FFmpeg command to merge the streams in real-time
-        const ffmpegArgs = [
-            '-i', 'pipe:0',  // Read from stdin (yt-dlp output)
-            '-c:v', 'copy',  // Copy video codec (no re-encoding)
-            '-c:a', 'aac',   // Convert audio to AAC
-            '-strict', '-2', // Allow experimental codecs (for Opus)
-            '-y',            // Overwrite output file
-            outputPath
-        ];
-
-        console.log(`🚀 yt-dlp: ${YTDLP_BINARY_PATH} ${ytdlpArgs.join(' ')}`);
-        console.log(`🎬 FFmpeg: ${FFMPEG_PATH} ${ffmpegArgs.join(' ')}`);
-
-        // Spawn yt-dlp process
-        console.log('--- EXECUTING YT-DLP WITH ARGS:', ytdlpArgs.join(' '));
-        const ytdlp = spawn(YTDLP_BINARY_PATH, ytdlpArgs, {
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
-
-        // Spawn FFmpeg process
-        const ffmpegProcess = spawn(FFMPEG_PATH, ffmpegArgs, {
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
-
-        // Pipe yt-dlp output directly to FFmpeg input (REAL-TIME!)
-        ytdlp.stdout.pipe(ffmpegProcess.stdin);
-        
-        // Handle yt-dlp stderr for progress
-        ytdlp.stderr.on('data', (data) => {
-            const output = data.toString();
-            // Filter out binary noise, only show meaningful progress
-            if (output.includes('[download]') || output.includes('%')) {
-                console.log('📥 yt-dlp:', output.trim());
-                if (progressCallback) {
-                    const match = output.match(/(\d+\.\d+)%/);
-                    if (match) {
-                        const percent = parseFloat(match[1]);
-                        progressCallback({ 
-                            message: `Real-time merging... ${percent}%`, 
-                            progress: percent 
-                        });
-                    }
-                }
-            }
-        });
-
-        // Handle FFmpeg stderr for progress
-        ffmpegProcess.stderr.on('data', (data) => {
-            const output = data.toString();
-            // Only log meaningful FFmpeg output, not binary noise
-            if (output.includes('time=') || output.includes('frame=')) {
-                console.log('🎬 FFmpeg:', output.trim());
-            }
-        });
-
-        // Handle errors
-        ytdlp.on('error', (error) => {
-            console.error('❌ yt-dlp error:', error);
-            reject(error);
-        });
-
-        ffmpegProcess.on('error', (error) => {
-            console.error('❌ FFmpeg error:', error);
-            reject(error);
-        });
-
-        // Handle completion
-        ffmpegProcess.on('close', (code) => {
-            if (code === 0) {
-                console.log('✅ Real-time FFmpeg merge completed successfully!');
-                resolve();
-            } else {
-                console.error(`❌ FFmpeg exited with code ${code}`);
-                reject(new Error(`FFmpeg process failed with exit code ${code}`));
-            }
-        });
-
-        ytdlp.on('close', (code) => {
-            if (code !== 0) {
-                console.error(`❌ yt-dlp exited with code ${code}`);
-                reject(new Error(`yt-dlp process failed with exit code ${code}`));
-            }
-        });
-    });
-}
-
 function updateVideosJson(videoName, description, status, timestamp, filename) {
     const videosJsonPath = path.join(__dirname, 'videos.json');
     let videosData = { videos: [] };
@@ -265,7 +165,6 @@ function updateVideosJson(videoName, description, status, timestamp, filename) {
             timestamp: timestamp,
             filename: filename
         });
-
         fs.writeFileSync(videosJsonPath, JSON.stringify(videosData, null, 2));
         console.log(`Updated videos.json with new entry: ${videoName}`);
     }
