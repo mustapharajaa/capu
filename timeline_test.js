@@ -81,9 +81,11 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         '--remote-debugging-port=9222', // Enable remote debugging for browser reuse
                         '--disable-web-security', // Reduce security restrictions that might cause DOM issues
                         '--disable-features=VizDisplayCompositor', // Improve stability for concurrent tabs
-                        '--disable-gpu', // Reduce GPU usage for concurrent instances
                         '--disable-gpu-sandbox', // Additional GPU sandbox disable for RDP
-                        '--disable-software-rasterizer', // Disable software rasterizer for RDP
+                        '--enable-webgl', // Enable WebGL for CapCut compatibility
+                        '--enable-accelerated-2d-canvas', // Enable hardware acceleration for CapCut
+                        '--enable-webgl2-compute-context', // Enable WebGL2 compute context for CapCut
+                        '--use-gl=swiftshader', // Use SwiftShader for WebGL on RDP (software rendering)
                         '--disable-dev-shm-usage', // Overcome limited resource problems
                         '--disable-extensions', // Disable extensions to save memory
                         '--no-first-run', // Skip first run setup
