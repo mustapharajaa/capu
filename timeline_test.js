@@ -72,9 +72,39 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         } catch (connectError) {
             console.log('❌ Failed to connect to existing browser:', connectError.message);
             console.log('🔍 Connection error details:', connectError.name);
-            console.log('🚀 Will launch new browser instance...');
-            // Launch new browser if no existing instance found
-            try {
+            
+            // Check if it's a fetch failed error (browser might be starting up)
+            if (connectError.message.includes('fetch failed') || connectError.message.includes('ECONNREFUSED')) {
+                console.log('🔄 Browser might be starting up, waiting 5 seconds and retrying...');
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                
+                try {
+                    console.log('🔗 Retry: Connecting to http://localhost:9222...');
+                    const retryBrowser = await puppeteer.connect({
+                        browserURL: 'http://localhost:9222',
+                        defaultViewport: null
+                    });
+                    browser = retryBrowser;
+                    console.log('✅ Successfully connected to existing browser on retry!');
+                    
+                    // Add extra delay for concurrent automations to prevent DOM conflicts
+                    const randomDelay = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds
+                    console.log(`⏳ Adding ${randomDelay/1000}s random delay to prevent DOM conflicts...`);
+                    await new Promise(resolve => setTimeout(resolve, randomDelay));
+                    
+                } catch (retryError) {
+                    console.log('❌ Retry also failed:', retryError.message);
+                    console.log('🚀 Will launch new browser instance...');
+                    // Fall through to launch new browser
+                }
+            } else {
+                console.log('🚀 Will launch new browser instance...');
+            }
+            
+            // Only launch new browser if connection and retry both failed
+            if (!browser) {
+                // Launch new browser if no existing instance found
+                try {
                 const launchOptions = {
                     userDataDir: USER_DATA_DIR, // Persist browser data like login sessions
                     headless: false,
@@ -84,6 +114,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         '--no-sandbox', // Required for running as root on Linux
                         '--disable-setuid-sandbox', // Additional sandbox disable for RDP
                         '--remote-debugging-port=9222', // Enable remote debugging for browser reuse
+                        '--remote-allow-origins=*', // Allow remote debugging connections
                         '--disable-web-security', // Reduce security restrictions that might cause DOM issues
                         '--disable-features=VizDisplayCompositor', // Improve stability for concurrent tabs
                         '--disable-gpu-sandbox', // Additional GPU sandbox disable for RDP
@@ -129,6 +160,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 }
                 
                 throw new Error(`Failed to launch browser process: ${launchError.message}`);
+                }
             }
         }
 
