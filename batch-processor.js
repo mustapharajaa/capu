@@ -179,8 +179,8 @@ class BatchProcessor {
 
                 console.log(`📋 Found ${urls.length} URLs in queue, ${availableEditorsCount} editors available`);
                 
-                // Determine how many videos to process concurrently (maximum 3)
-                const maxConcurrent = 3; // Maximum 3 automations at once
+                // Determine how many videos to process concurrently (maximum 3 with shared browser)
+                const maxConcurrent = 3; // Maximum 3 automations at once (shared browser, multiple tabs)
                 const concurrentCount = Math.min(urls.length, availableEditorsCount, maxConcurrent);
                 
                 // Log automation limit enforcement
