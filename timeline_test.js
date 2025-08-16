@@ -53,14 +53,16 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         }
         
         // Try to connect to existing browser first, or launch new one
+        console.log('🔍 Attempting to connect to existing browser on port 9222...');
         try {
             // Try to connect to existing browser instance
+            console.log('🔗 Connecting to http://localhost:9222...');
             const existingBrowsers = await puppeteer.connect({
                 browserURL: 'http://localhost:9222',
                 defaultViewport: null
             });
             browser = existingBrowsers;
-            console.log('🔄 Connected to existing browser instance');
+            console.log('✅ Successfully connected to existing browser instance');
             
             // Add extra delay for concurrent automations to prevent DOM conflicts
             const randomDelay = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds
@@ -68,6 +70,9 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             await new Promise(resolve => setTimeout(resolve, randomDelay));
             
         } catch (connectError) {
+            console.log('❌ Failed to connect to existing browser:', connectError.message);
+            console.log('🔍 Connection error details:', connectError.name);
+            console.log('🚀 Will launch new browser instance...');
             // Launch new browser if no existing instance found
             try {
                 const launchOptions = {
