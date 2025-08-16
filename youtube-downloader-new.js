@@ -50,9 +50,22 @@ async function downloadYouTubeVideo(url, progressCallback) {
 
             // Get video metadata first to get the title for the filename
             console.log('Fetching video metadata using browser cookies...');
-            const metadata = await ytDlpWrap.getVideoInfo(url, {
-                cookiesFromBrowser: 'chrome,edge,firefox' // Try Chrome, then Edge, then Firefox
+
+            const metadataArgs = [
+                '--dump-json',
+                '--cookies-from-browser', 'chrome,edge,firefox',
+                url
+            ];
+
+            let metadataOutput = '';
+            await new Promise((resolveExec, rejectExec) => {
+                ytDlpWrap.exec(metadataArgs)
+                    .on('stdout', (data) => { metadataOutput += data; })
+                    .on('error', rejectExec)
+                    .on('close', resolveExec);
             });
+
+            const metadata = JSON.parse(metadataOutput);
             console.log('Successfully fetched metadata.');
 
             const sanitizedTitle = sanitizeFilename(metadata.title);
