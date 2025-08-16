@@ -73,6 +73,24 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             console.log('❌ Failed to connect to existing browser:', connectError.message);
             console.log('🔍 Connection error details:', connectError.name);
             
+            // Diagnostic: Check if browser process is running
+            try {
+                const { execSync } = require('child_process');
+                const browserProcesses = execSync('tasklist /FI "IMAGENAME eq chrome.exe" /FO CSV', { encoding: 'utf8' });
+                const processCount = (browserProcesses.match(/chrome\.exe/g) || []).length;
+                console.log(`🔍 Diagnostic: Found ${processCount} Chrome processes running`);
+                
+                // Try to check if port 9222 is listening
+                try {
+                    const netstat = execSync('netstat -an | findstr :9222', { encoding: 'utf8' });
+                    console.log('🔍 Port 9222 status:', netstat.trim() || 'Not listening');
+                } catch (portError) {
+                    console.log('🔍 Port 9222: Not accessible or not listening');
+                }
+            } catch (diagError) {
+                console.log('🔍 Could not run diagnostics:', diagError.message);
+            }
+            
             // Check if it's a fetch failed error (browser might be starting up)
             if (connectError.message.includes('fetch failed') || connectError.message.includes('ECONNREFUSED')) {
                 console.log('🔄 Browser might be starting up, waiting 5 seconds and retrying...');
@@ -1371,3 +1389,4 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 module.exports = {
     runSimpleUpload
 };
+
