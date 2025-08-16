@@ -112,18 +112,11 @@ app.post('/upload', upload.single('video'), async (req, res) => {
         const runningCount = getRunningAutomationsCount();
         
         if (runningCount >= maxConcurrent) {
-            console.log(`🔒 Automation limit reached: ${runningCount}/${maxConcurrent} automations running`);
-            console.log('❌ Local upload blocked - too many concurrent automations');
-            
-            // Delete the uploaded file since automation cannot proceed
-            if (fs.existsSync(absoluteFilePath)) {
-                fs.unlinkSync(absoluteFilePath);
-                console.log(`🗑️ Deleted uploaded file: ${path.basename(absoluteFilePath)}`);
-            }
-            
+            console.log(`❌ Concurrent automation limit reached (${runningCount}/${maxConcurrent})`);
+            broadcastProgress(`❌ Limit reached - please wait`);
             return res.status(429).json({
                 success: false,
-                message: `Too many concurrent automations (${runningCount}/${maxConcurrent}). Please wait for an automation to complete before uploading.`,
+                message: `Maximum concurrent automations (${maxConcurrent}) reached. Please try again later.`,
                 runningCount: runningCount,
                 maxConcurrent: maxConcurrent
             });
@@ -160,13 +153,12 @@ app.get('/videos.json', (req, res) => {
     if (fs.existsSync(videosJsonPath)) {
         res.sendFile(videosJsonPath);
     } else {
-        res.json({ videos: [] }); // Return empty array if file doesn't exist
+        res.status(404).json({ success: false, message: 'videos.json not found' });
     }
 });
 
-// Server-Sent Events for progress updates
+// Progress update stream
 const progressClients = new Set();
-
 app.get('/progress', (req, res) => {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -184,33 +176,26 @@ app.get('/progress', (req, res) => {
 
 // Function to broadcast progress to all connected clients
 function broadcastProgress(message) {
-    const data = `data: ${JSON.stringify({ message, timestamp: new Date().toISOString() })}\n\n`;
-    progressClients.forEach(client => {
-        try {
-            client.write(data);
-        } catch (err) {
-            progressClients.delete(client);
-        }
-    });
+    for (const client of progressClients) {
+        client.write(`data: ${JSON.stringify({ message })}\n\n`);
+    }
 }
 
 // Make broadcastProgress available globally
 global.broadcastProgress = broadcastProgress;
 
 // Simple upload endpoint for CapCut automation
-app.post('/upload', async (req, res) => {
+app.post('/simple-upload', async (req, res) => {
     try {
         const { videoPath } = req.body;
-        if (!videoPath || !fs.existsSync(videoPath)) {
-            return res.status(400).json({ success: false, message: 'Valid video path is required' });
+        if (!videoPath) {
+            return res.status(400).json({ success: false, message: 'Video path is required.' });
         }
 
-        broadcastProgress('🚀 Starting CapCut upload automation...');
-        
-        const result = await runSimpleUpload(videoPath, (message) => {
-            broadcastProgress(message);
-        }, 'Direct Upload');
-        
+        const result = await runSimpleUpload(videoPath, (progress) => {
+            broadcastProgress(progress);
+        });
+
         res.json({ success: true, message: result.message });
     } catch (error) {
         console.error('Upload automation error:', error);
@@ -237,7 +222,7 @@ app.post('/youtube/info', async (req, res) => {
         
         res.json({ 
             success: true, 
-            info: videoInfo 
+            ...videoInfo 
         });
     } catch (error) {
         console.error('Error getting video info:', error);
@@ -258,23 +243,18 @@ app.post('/youtube/download', async (req, res) => {
 
         // Check editor availability BEFORE downloading to prevent waste
         const editorsPath = path.join(__dirname, 'editors.json');
-        if (fs.existsSync(editorsPath)) {
-            const editors = JSON.parse(fs.readFileSync(editorsPath, 'utf-8'));
-            const availableEditors = editors.filter(editor => editor.status === 'available');
-            
-            if (availableEditors.length === 0) {
-                console.log('❌ All editors are currently in-use - YouTube download blocked');
-                broadcastProgress('❌ All editors busy - download blocked');
-                return res.status(409).json({ 
-                    success: false, 
-                    message: 'All editors are currently in-use. Please wait for an editor to become available before downloading videos.' 
-                });
-            }
+        if (!fs.existsSync(editorsPath)) {
+            throw new Error('editors.json not found - cannot check editor availability');
+        }
+        const editors = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
+        const availableEditor = editors.find(editor => editor.status === 'available');
+        if (!availableEditor) {
+            console.log('❌ All editors are busy - download blocked');
+            broadcastProgress('❌ All editors are busy - download blocked');
+            return res.status(429).json({ success: false, message: 'All editors are currently in-use.' });
         }
 
-        broadcastProgress('🚀 Starting YouTube video download...');
-        
-        // Download the video with progress updates
+        broadcastProgress('📥 Download starting...');
         const downloadedPath = await downloadYouTubeVideo(url, (progress) => {
             broadcastProgress(progress);
         });
@@ -380,54 +360,6 @@ const server = app.listen(port, () => {
 });
 
 // --- Graceful Shutdown ---
-async function cleanupBrowser() {
-    console.log('🧹 Cleaning up browser instances...');
-    return new Promise((resolve) => {
-        // Command to find the process using port 9222 on Windows
-        const command = 'netstat -aon | findstr :9222';
-        exec(command, (err, stdout, stderr) => {
-            if (err || !stdout) {
-                // This is expected if no process is listening on the port
-                console.log('✅ No browser process found on port 9222.');
-                return resolve();
-            }
-
-            const lines = stdout.trim().split('\n');
-            const pids = new Set();
-
-            lines.forEach(line => {
-                const parts = line.trim().split(/\s+/);
-                const pid = parts[parts.length - 1];
-                if (pid && pid !== '0' && /LISTENING|ESTABLISHED/.test(line)) {
-                    pids.add(pid);
-                }
-            });
-
-            if (pids.size === 0) {
-                console.log('✅ No active browser process found to kill.');
-                return resolve();
-            }
-
-            let killedCount = 0;
-            pids.forEach(pid => {
-                console.log(`🔪 Terminating browser process with PID: ${pid}`);
-                // Forcefully kill the process by PID
-                exec(`taskkill /PID ${pid} /F`, (killErr, killStdout, killStderr) => {
-                    if (killErr) {
-                        console.error(`❌ Failed to kill process ${pid}:`, killStderr);
-                    } else {
-                        console.log(`👍 Successfully terminated process ${pid}.`);
-                    }
-                    killedCount++;
-                    if (killedCount === pids.size) {
-                        resolve();
-                    }
-                });
-            });
-        });
-    });
-}
-
 async function cleanupBrowser() {
     console.log('🧹 Cleaning up browser instances...');
     return new Promise((resolve) => {
