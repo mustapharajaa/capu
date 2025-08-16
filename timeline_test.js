@@ -20,7 +20,6 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
     let browser = null;
     let page = null;
     let editorUrl = null;
-    let originalEditorStatus = null;
     
     try {
         console.log('🚀 Starting CapCut automation...');
@@ -30,8 +29,8 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             const editorsPath = path.join(__dirname, 'editors.json');
             if (fs.existsSync(editorsPath)) {
                 const editors = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
-                // Find an available editor (not currently running) and mark it as in-use
-                const availableEditor = editors.find(editor => editor.result !== 'running');
+                // Find an available editor and mark it as in-use
+                const availableEditor = editors.find(editor => editor.status === 'available');
                 if (availableEditor) {
                     editorUrl = availableEditor.url;
                     // Set editor status to "in-use" and record start time
@@ -55,58 +54,51 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         // Try to connect to existing browser first, or launch new one
         try {
             // Try to connect to existing browser instance
-            const existingBrowsers = await puppeteer.connect({
+            browser = await puppeteer.connect({
                 browserURL: 'http://localhost:9222',
                 defaultViewport: null
             });
-            browser = existingBrowsers;
             console.log('🔄 Connected to existing browser instance');
-            
-            // Add extra delay for concurrent automations to prevent DOM conflicts
-            const randomDelay = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds
-            console.log(`⏳ Adding ${randomDelay/1000}s random delay to prevent DOM conflicts...`);
-            await new Promise(resolve => setTimeout(resolve, randomDelay));
-            
         } catch (connectError) {
             // Launch new browser if no existing instance found
             try {
-                const launchOptions = {
-                    userDataDir: USER_DATA_DIR, // Persist browser data like login sessions
-                    headless: false,
-                    args: [
-                        '--start-maximized',
-                        '--disable-blink-features=AutomationControlled',
-                        '--no-sandbox', // Required for running as root on Linux
-                        '--remote-debugging-port=9222', // Enable remote debugging for browser reuse
-                        '--disable-web-security', // Reduce security restrictions that might cause DOM issues
-                        '--disable-features=VizDisplayCompositor', // Improve stability for concurrent tabs
-                        '--disable-gpu', // Reduce GPU usage for concurrent instances
-                        '--disable-dev-shm-usage', // Overcome limited resource problems
-                        '--disable-extensions', // Disable extensions to save memory
-                        '--no-first-run', // Skip first run setup
-                        '--disable-background-timer-throttling', // Prevent background throttling
-                        '--disable-backgrounding-occluded-windows',
-                        '--disable-renderer-backgrounding'
-                    ],
-                    protocolTimeout: 18000000 // 300 minutes timeout for long background removal processing
-                };
+                 const launchOptions = {
+                     userDataDir: USER_DATA_DIR, // Persist browser data like login sessions
+                     headless: false,
+                     args: [
+                         '--start-maximized',
+                         '--disable-blink-features=AutomationControlled',
+                         '--no-sandbox', // Required for running as root on Linux
+                         '--remote-debugging-port=9222', // Enable remote debugging for browser reuse
+                         '--disable-web-security', // Reduce security restrictions that might cause DOM issues
+                         '--disable-features=VizDisplayCompositor', // Improve stability for concurrent tabs
+                         '--disable-gpu', // Reduce GPU usage for concurrent instances
+                         '--disable-dev-shm-usage', // Overcome limited resource problems
+                         '--disable-extensions', // Disable extensions to save memory
+                         '--no-first-run', // Skip first run setup
+                         '--disable-background-timer-throttling', // Prevent background throttling
+                         '--disable-backgrounding-occluded-windows',
+                         '--disable-renderer-backgrounding'
+                     ],
+                     protocolTimeout: 18000000 // 300 minutes timeout for long background removal processing
+                 };
 
                 browser = await puppeteer.launch(launchOptions);
                 console.log('🚀 Launched new browser instance');
             } catch (launchError) {
-                console.error('❌ Failed to launch browser process:', launchError.message);
-                
-                // Reset editor status on browser launch failure
+                 console.error('❌ Failed to launch new browser:', launchError.message);
+                // If browser launch fails, set editor status back to available
                 try {
                     const editorsPath = path.join(__dirname, 'editors.json');
                     if (fs.existsSync(editorsPath)) {
                         const editors = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
                         const currentEditor = editors.find(editor => editor.url === editorUrl);
                         if (currentEditor) {
+                            currentEditor.status = 'available';
                             currentEditor.result = 'error';
-                            currentEditor.errorType = 'browser_launch_failed';
+                            currentEditor.errorType = 'browser-launch-failed';
                             fs.writeFileSync(editorsPath, JSON.stringify(editors, null, 4));
-                            console.log('📝 Editor status reset to "error" after browser launch failure');
+                            console.log('📝 Editor status reset to available after browser launch failure');
                         }
                     }
                 } catch (statusError) {
@@ -1304,6 +1296,3 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 module.exports = {
     runSimpleUpload
 };
-
-
-
