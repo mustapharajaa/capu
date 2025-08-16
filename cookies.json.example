@@ -1,0 +1,29 @@
+[
+  {
+    "name": "session_id",
+    "value": "your_session_value_here",
+    "domain": ".capcut.com",
+    "path": "/",
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "user_token",
+    "value": "your_user_token_here",
+    "domain": ".capcut.com",
+    "path": "/",
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "auth_cookie",
+    "value": "your_auth_cookie_value",
+    "domain": "www.capcut.com",
+    "path": "/",
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "None"
+  }
+]

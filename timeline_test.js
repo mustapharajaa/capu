@@ -56,9 +56,17 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         
         // Function to connect to existing browser or launch a new one
         async function getBrowserInstance(editorId) {
+            // Check if we have a global browser and it's still connected
             if (globalBrowser) {
-                console.log('🔄 Reusing existing browser instance');
-                return globalBrowser;
+                try {
+                    // Test if browser is still connected by checking if it's connected
+                    await globalBrowser.version();
+                    console.log('🔄 Reusing existing browser instance');
+                    return globalBrowser;
+                } catch (error) {
+                    console.log('⚠️ Existing browser disconnected, clearing reference');
+                    globalBrowser = null;
+                }
             }
 
             // Try to connect to an existing browser via remote debugging
@@ -129,11 +137,17 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 const cookies = JSON.parse(fs.readFileSync(cookiesPath, 'utf8'));
                 if (Array.isArray(cookies) && cookies.length > 0) {
                     await page.setCookie(...cookies);
-                    console.log('✅ Loaded cookies for authentication');
+                    console.log(`✅ Loaded ${cookies.length} cookies for authentication`);
+                    if (progressCallback) progressCallback(`🍪 Loaded ${cookies.length} cookies for login`);
+                } else {
+                    console.log('⚠️ cookies.json exists but contains no valid cookies');
                 }
             } catch (error) {
                 console.warn('⚠️ Failed to load cookies:', error.message);
+                if (progressCallback) progressCallback('⚠️ Cookie loading failed - continuing without login');
             }
+        } else {
+            console.log('ℹ️ No cookies.json file found - continuing without authentication');
         }
 
         // Use the editorUrl from status management, or set fallback if not set
@@ -398,22 +412,81 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         console.log(`📊 Badge content: "${badgeText}"`);
                         if (progressCallback) progressCallback(`⏳ Upload badge detected (${badgeText}), waiting for completion...`);
                         
-                        // Wait for badge to disappear (up to 40 minutes)
+                        // Wait for badge to disappear (up to 40 minutes) with popup monitoring
                         console.log('⏳ Waiting for upload badge to disappear (up to 40 minutes)...');
-                        await page.waitForFunction(
-                            (selector) => {
+                        
+                        // Monitor for both badge disappearance and "Continue uploading" popup
+                        const startTime = Date.now();
+                        const maxWaitTime = 2400000; // 40 minutes
+                        let badgeDisappeared = false;
+                        
+                        while (!badgeDisappeared && (Date.now() - startTime) < maxWaitTime) {
+                            // Check for "Continue uploading" popup and click it
+                            try {
+                                const continuePopupSelectors = [
+                                    'button:has-text("Continue uploading")',
+                                    'button.lv-btn.lv-btn-secondary:has-text("Continue uploading")',
+                                    'xpath//button[contains(@class, "lv-btn") and .//span[text()="Continue uploading"]]',
+                                    'xpath///html/body/div[12]/div[2]/div/div[2]/div[3]/div/button[1]',
+                                    'body > div:nth-child(73) > div.lv-modal-wrapper.lv-modal-wrapper-align-center > div > div:nth-child(2) > div.lv-modal-footer > div > button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button'
+                                ];
+                                
+                                for (const popupSelector of continuePopupSelectors) {
+                                    try {
+                                        let continueButton = null;
+                                        if (popupSelector.startsWith('xpath//')) {
+                                            const xpath = popupSelector.replace('xpath//', '');
+                                            continueButton = await page.$x(xpath);
+                                            continueButton = continueButton[0];
+                                        } else {
+                                            continueButton = await page.$(popupSelector);
+                                        }
+                                        
+                                        if (continueButton) {
+                                            console.log('🔄 Found "Continue uploading" popup - clicking to continue...');
+                                            if (progressCallback) progressCallback('🔄 Clicking "Continue uploading" popup...');
+                                            await continueButton.click();
+                                            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds after click
+                                            console.log('✅ "Continue uploading" popup clicked successfully');
+                                            break;
+                                        }
+                                    } catch (popupError) {
+                                        // Continue to next selector if this one fails
+                                    }
+                                }
+                            } catch (popupCheckError) {
+                                // Continue monitoring if popup check fails
+                            }
+                            
+                            // Check if upload badge has disappeared
+                            try {
+                                let badgeElement = null;
                                 if (selector.startsWith('xpath//')) {
                                     const xpath = selector.replace('xpath//', '');
-                                    const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-                                    return !result.singleNodeValue;
+                                    const result = await page.evaluate((xpath) => {
+                                        const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+                                        return result.singleNodeValue;
+                                    }, xpath);
+                                    badgeElement = result;
                                 } else {
-                                    const element = document.querySelector(selector);
-                                    return !element;
+                                    badgeElement = await page.$(selector);
                                 }
-                            },
-                            { timeout: 2400000 }, // 40 minutes
-                            selector
-                        );
+                                
+                                if (!badgeElement) {
+                                    badgeDisappeared = true;
+                                    break;
+                                }
+                            } catch (badgeCheckError) {
+                                // Continue monitoring if badge check fails
+                            }
+                            
+                            // Wait 3 seconds before next check
+                            await new Promise(resolve => setTimeout(resolve, 3000));
+                        }
+                        
+                        if (!badgeDisappeared) {
+                            throw new Error('Upload badge monitoring timeout after 40 minutes');
+                        }
                         
                         console.log('✅ Upload badge disappeared - upload fully complete!');
                         if (progressCallback) progressCallback('✅ Upload badge cleared - ready for timeline!');
@@ -522,56 +595,6 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         
         if (!videoAddedToTimeline) {
             throw new Error('Failed to add video to timeline - all selector methods failed');
-        }
-
-        // Enhanced error handling for DOM detachment during timeline addition
-        try {
-            console.log('🔄 Trying timeline addition method 1/2...');
-            await page.evaluate((videoName) => {
-                const videoElement = Array.from(document.querySelectorAll('div')).find(div => div.textContent.includes(videoName));
-                if (videoElement) {
-                    videoElement.scrollIntoView();
-                    videoElement.click();
-                    const timelineDropArea = document.querySelector('#timeline-container');
-                    if (timelineDropArea) {
-                        const rect = timelineDropArea.getBoundingClientRect();
-                        const x = rect.left + rect.width / 2;
-                        const y = rect.top + rect.height / 2;
-                        videoElement.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: x, clientY: y }));
-                        videoElement.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x, clientY: y }));
-                        videoElement.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: x, clientY: y }));
-                        return true;
-                    }
-                }
-                return false;
-            }, videoFileName);
-            console.log('✅ Video added to timeline successfully!');
-            return;
-        } catch (e) {
-            console.error('⚠️ Method 1 failed (DOM detachment):', e.message);
-            console.log('🔄 Trying timeline addition method 2/2...');
-            // Retry with a delay to allow DOM to stabilize
-            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-            try {
-                const result = await page.evaluate(() => {
-                    const timelineDropArea = document.querySelector('#timeline-container');
-                    if (timelineDropArea) {
-                        timelineDropArea.click();
-                        return true;
-                    }
-                    return false;
-                });
-                if (result) {
-                    console.log('✅ Video added to timeline using fallback method!');
-                    return;
-                } else {
-                    console.error('❌ Failed to add video to timeline - all methods exhausted');
-                    throw new Error('Failed to add video to timeline');
-                }
-            } catch (retryError) {
-                console.error('❌ Retry failed:', retryError.message);
-                throw new Error('Failed to add video to timeline after retry');
-            }
         }
 
         // Monitor for video loading completion (if loading image appears)
@@ -1221,6 +1244,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             } else {
                 console.log('⚠️ Could not find the cutout switch');
                 if (progressCallback) progressCallback('⚠️ Could not find Remove Background switch');
+                throw new Error('Could not find Remove Background switch - automation failed');
             }
             
         } catch (removeBackgroundError) {

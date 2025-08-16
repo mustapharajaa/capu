@@ -16,6 +16,7 @@ add your .env.exemple details to .env paths it auto update
 edite editors.json and new videos file
 edite youtube-cookies.txt 
 edite google sheet key file  capcut-sheet-service-account.json
+edit cookies.json.exemple for login capcut error
 npm run start
 ```
 
