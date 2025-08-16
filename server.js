@@ -19,7 +19,7 @@ function getRunningAutomationsCount() {
         }
 
         const editors = JSON.parse(fs.readFileSync(editorsFile, 'utf8'));
-        const runningAutomations = editors.filter(editor => editor.status === 'in-use');
+        const runningAutomations = editors.filter(editor => editor.result === 'running');
         return runningAutomations.length;
     } catch (error) {
         console.error('❌ Error counting running automations:', error.message);
