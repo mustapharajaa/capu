@@ -53,85 +53,23 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         }
         
         // Try to connect to existing browser first, or launch new one
-        console.log('🔍 Attempting to connect to existing browser on port 9222...');
         try {
-            // Alternative connection method: try to get browser endpoint directly
-            console.log('🔗 Fetching browser endpoint from http://localhost:9222/json/version...');
-            const response = await fetch('http://localhost:9222/json/version');
-            if (response.ok) {
-                const versionInfo = await response.json();
-                console.log('✅ Browser endpoint accessible, connecting via WebSocket...');
-                
-                // Connect using the WebSocket endpoint directly
-                const existingBrowsers = await puppeteer.connect({
-                    browserWSEndpoint: versionInfo.webSocketDebuggerUrl,
-                    defaultViewport: null
-                });
-                browser = existingBrowsers;
-                console.log('✅ Successfully connected to existing browser via WebSocket');
-                
-                // Add extra delay for concurrent automations to prevent DOM conflicts
-                const randomDelay = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds
-                console.log(`⏳ Adding ${randomDelay/1000}s random delay to prevent DOM conflicts...`);
-                await new Promise(resolve => setTimeout(resolve, randomDelay));
-            } else {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
+            // Try to connect to existing browser instance
+            const existingBrowsers = await puppeteer.connect({
+                browserURL: 'http://localhost:9222',
+                defaultViewport: null
+            });
+            browser = existingBrowsers;
+            console.log('🔄 Connected to existing browser instance');
+            
+            // Add extra delay for concurrent automations to prevent DOM conflicts
+            const randomDelay = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds
+            console.log(`⏳ Adding ${randomDelay/1000}s random delay to prevent DOM conflicts...`);
+            await new Promise(resolve => setTimeout(resolve, randomDelay));
             
         } catch (connectError) {
-            console.log('❌ Failed to connect to existing browser:', connectError.message);
-            console.log('🔍 Connection error details:', connectError.name);
-            
-            // Diagnostic: Check if browser process is running
+            // Launch new browser if no existing instance found
             try {
-                const { execSync } = require('child_process');
-                const browserProcesses = execSync('tasklist /FI "IMAGENAME eq chrome.exe" /FO CSV', { encoding: 'utf8' });
-                const processCount = (browserProcesses.match(/chrome\.exe/g) || []).length;
-                console.log(`🔍 Diagnostic: Found ${processCount} Chrome processes running`);
-                
-                // Try to check if port 9222 is listening
-                try {
-                    const netstat = execSync('netstat -an | findstr :9222', { encoding: 'utf8' });
-                    console.log('🔍 Port 9222 status:', netstat.trim() || 'Not listening');
-                } catch (portError) {
-                    console.log('🔍 Port 9222: Not accessible or not listening');
-                }
-            } catch (diagError) {
-                console.log('🔍 Could not run diagnostics:', diagError.message);
-            }
-            
-            // Check if it's a fetch failed error (browser might be starting up)
-            if (connectError.message.includes('fetch failed') || connectError.message.includes('ECONNREFUSED')) {
-                console.log('🔄 Browser might be starting up, waiting 5 seconds and retrying...');
-                await new Promise(resolve => setTimeout(resolve, 5000));
-                
-                try {
-                    console.log('🔗 Retry: Connecting to http://localhost:9222...');
-                    const retryBrowser = await puppeteer.connect({
-                        browserURL: 'http://localhost:9222',
-                        defaultViewport: null
-                    });
-                    browser = retryBrowser;
-                    console.log('✅ Successfully connected to existing browser on retry!');
-                    
-                    // Add extra delay for concurrent automations to prevent DOM conflicts
-                    const randomDelay = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds
-                    console.log(`⏳ Adding ${randomDelay/1000}s random delay to prevent DOM conflicts...`);
-                    await new Promise(resolve => setTimeout(resolve, randomDelay));
-                    
-                } catch (retryError) {
-                    console.log('❌ Retry also failed:', retryError.message);
-                    console.log('🚀 Will launch new browser instance...');
-                    // Fall through to launch new browser
-                }
-            } else {
-                console.log('🚀 Will launch new browser instance...');
-            }
-            
-            // Only launch new browser if connection and retry both failed
-            if (!browser) {
-                // Launch new browser if no existing instance found
-                try {
                 const launchOptions = {
                     userDataDir: USER_DATA_DIR, // Persist browser data like login sessions
                     headless: false,
@@ -139,27 +77,16 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         '--start-maximized',
                         '--disable-blink-features=AutomationControlled',
                         '--no-sandbox', // Required for running as root on Linux
-                        '--disable-setuid-sandbox', // Additional sandbox disable for RDP
                         '--remote-debugging-port=9222', // Enable remote debugging for browser reuse
-                        '--remote-allow-origins=*', // Allow remote debugging connections
                         '--disable-web-security', // Reduce security restrictions that might cause DOM issues
                         '--disable-features=VizDisplayCompositor', // Improve stability for concurrent tabs
-                        '--disable-gpu-sandbox', // Additional GPU sandbox disable for RDP
-                        '--enable-webgl', // Enable WebGL for CapCut compatibility
-                        '--enable-accelerated-2d-canvas', // Enable hardware acceleration for CapCut
-                        '--enable-webgl2-compute-context', // Enable WebGL2 compute context for CapCut
-                        '--use-gl=swiftshader', // Use SwiftShader for WebGL on RDP (software rendering)
+                        '--disable-gpu', // Reduce GPU usage for concurrent instances
                         '--disable-dev-shm-usage', // Overcome limited resource problems
                         '--disable-extensions', // Disable extensions to save memory
                         '--no-first-run', // Skip first run setup
                         '--disable-background-timer-throttling', // Prevent background throttling
                         '--disable-backgrounding-occluded-windows',
-                        '--disable-renderer-backgrounding',
-                        '--disable-ipc-flooding-protection', // Prevent IPC flooding issues on RDP
-                        '--disable-hang-monitor', // Disable hang monitor for RDP stability
-                        '--disable-prompt-on-repost', // Disable repost prompts
-                        '--disable-domain-reliability', // Disable domain reliability reporting
-                        '--disable-component-extensions-with-background-pages' // Reduce background processes
+                        '--disable-renderer-backgrounding'
                     ],
                     protocolTimeout: 18000000 // 300 minutes timeout for long background removal processing
                 };
@@ -187,7 +114,6 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 }
                 
                 throw new Error(`Failed to launch browser process: ${launchError.message}`);
-                }
             }
         }
 
@@ -234,30 +160,10 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         console.log(`✅ Using editor: ${editorUrl.substring(0, 50)}...`);
 
         console.log('🌐 Loading CapCut...');
-        console.log(`🔗 Navigating to: ${editorUrl}`);
-        
-        try {
-            await page.goto(editorUrl, { 
-                waitUntil: 'networkidle2',
-                timeout: 420000  // 7 minutes for very slow CapCut loading
-            });
-            console.log('✅ Page navigation completed successfully');
-        } catch (navigationError) {
-            console.error('❌ Page navigation failed:', navigationError.message);
-            console.log(`🔗 Failed URL: ${editorUrl}`);
-            console.log('🔄 Retrying navigation with different wait condition...');
-            
-            try {
-                await page.goto(editorUrl, { 
-                    waitUntil: 'load',
-                    timeout: 300000  // 5 minutes with simpler wait condition
-                });
-                console.log('✅ Page navigation completed on retry');
-            } catch (retryError) {
-                console.error('❌ Page navigation failed on retry:', retryError.message);
-                throw new Error(`Failed to navigate to CapCut editor: ${retryError.message}`);
-            }
-        }
+        await page.goto(editorUrl, { 
+            waitUntil: 'networkidle2',
+            timeout: 420000  // 7 minutes for very slow CapCut loading
+        });
 
         if (progressCallback) progressCallback('📄 Page loaded, waiting for timeline...');
 
@@ -1398,5 +1304,6 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 module.exports = {
     runSimpleUpload
 };
+
 
 
