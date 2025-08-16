@@ -77,9 +77,16 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         '--start-maximized',
                         '--disable-blink-features=AutomationControlled',
                         '--no-sandbox', // Required for running as root on Linux
-                        '--remote-debugging-port=9222', // Enable remote debugging for reuse
+                        '--remote-debugging-port=9222', // Enable remote debugging for browser reuse
                         '--disable-web-security', // Reduce security restrictions that might cause DOM issues
-                        '--disable-features=VizDisplayCompositor' // Improve stability for concurrent tabs
+                        '--disable-features=VizDisplayCompositor', // Improve stability for concurrent tabs
+                        '--disable-gpu', // Reduce GPU usage for concurrent instances
+                        '--disable-dev-shm-usage', // Overcome limited resource problems
+                        '--disable-extensions', // Disable extensions to save memory
+                        '--no-first-run', // Skip first run setup
+                        '--disable-background-timer-throttling', // Prevent background throttling
+                        '--disable-backgrounding-occluded-windows',
+                        '--disable-renderer-backgrounding'
                     ],
                     protocolTimeout: 18000000 // 300 minutes timeout for long background removal processing
                 };
