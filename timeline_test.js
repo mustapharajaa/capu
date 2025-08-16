@@ -69,22 +69,45 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             
         } catch (connectError) {
             // Launch new browser if no existing instance found
-            const launchOptions = {
-                userDataDir: USER_DATA_DIR, // Persist browser data like login sessions
-                headless: false,
-                args: [
-                    '--start-maximized',
-                    '--disable-blink-features=AutomationControlled',
-                    '--no-sandbox', // Required for running as root on Linux
-                    '--remote-debugging-port=9222', // Enable remote debugging for reuse
-                    '--disable-web-security', // Reduce security restrictions that might cause DOM issues
-                    '--disable-features=VizDisplayCompositor' // Improve stability for concurrent tabs
-                ],
-                protocolTimeout: 18000000 // 300 minutes timeout for long background removal processing
-            };
+            try {
+                const launchOptions = {
+                    userDataDir: USER_DATA_DIR, // Persist browser data like login sessions
+                    headless: false,
+                    args: [
+                        '--start-maximized',
+                        '--disable-blink-features=AutomationControlled',
+                        '--no-sandbox', // Required for running as root on Linux
+                        '--remote-debugging-port=9222', // Enable remote debugging for reuse
+                        '--disable-web-security', // Reduce security restrictions that might cause DOM issues
+                        '--disable-features=VizDisplayCompositor' // Improve stability for concurrent tabs
+                    ],
+                    protocolTimeout: 18000000 // 300 minutes timeout for long background removal processing
+                };
 
-            browser = await puppeteer.launch(launchOptions);
-            console.log('🚀 Launched new browser instance');
+                browser = await puppeteer.launch(launchOptions);
+                console.log('🚀 Launched new browser instance');
+            } catch (launchError) {
+                console.error('❌ Failed to launch browser process:', launchError.message);
+                
+                // Reset editor status on browser launch failure
+                try {
+                    const editorsPath = path.join(__dirname, 'editors.json');
+                    if (fs.existsSync(editorsPath)) {
+                        const editors = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
+                        const currentEditor = editors.find(editor => editor.url === editorUrl);
+                        if (currentEditor) {
+                            currentEditor.result = 'error';
+                            currentEditor.errorType = 'browser_launch_failed';
+                            fs.writeFileSync(editorsPath, JSON.stringify(editors, null, 4));
+                            console.log('📝 Editor status reset to "error" after browser launch failure');
+                        }
+                    }
+                } catch (statusError) {
+                    console.log('⚠️ Could not reset editor status after browser launch failure');
+                }
+                
+                throw new Error(`Failed to launch browser process: ${launchError.message}`);
+            }
         }
 
         page = await browser.newPage();
