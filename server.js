@@ -106,7 +106,7 @@ app.post('/upload', upload.single('video'), async (req, res) => {
     try {
         console.log('📼 Starting CapCut automation for local upload...');
         
-        // Check concurrent automation limit (maximum 3)
+        // Check concurrent automation limit (maximum 3 with shared browser)
         const maxConcurrent = 3;
         const runningCount = getRunningAutomationsCount();
         
