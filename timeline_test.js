@@ -13,6 +13,9 @@ const googleSheets = new GoogleSheetsService();
 // User data directory for persistent browser sessions (like reference app)
 const USER_DATA_DIR = path.join(__dirname, 'puppeteer_data');
 
+// Global browser instance for reuse
+let globalBrowser = null;
+
 /**
  * Simple CapCut automation - Upload video and monitor for success
  */
@@ -51,65 +54,69 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             throw statusError;
         }
         
-        // Try to connect to existing browser first, or launch new one
-        try {
-            // Try to connect to existing browser instance
-            browser = await puppeteer.connect({
-                browserURL: 'http://localhost:9222',
-                defaultViewport: null
-            });
-            console.log('🔄 Connected to existing browser instance');
-        } catch (connectError) {
-            // Launch new browser if no existing instance found
-            try {
-                 const launchOptions = {
-                     userDataDir: USER_DATA_DIR, // Persist browser data like login sessions
-                     headless: false,
-                     args: [
-                         '--start-maximized',
-                         '--disable-blink-features=AutomationControlled',
-                         '--no-sandbox', // Required for running as root on Linux
-                         '--remote-debugging-port=9222', // Enable remote debugging for browser reuse
-                         '--disable-web-security', // Reduce security restrictions that might cause DOM issues
-                         '--disable-features=VizDisplayCompositor', // Improve stability for concurrent tabs
-                         '--disable-gpu', // Reduce GPU usage for concurrent instances
-                         '--disable-dev-shm-usage', // Overcome limited resource problems
-                         '--disable-extensions', // Disable extensions to save memory
-                         '--no-first-run', // Skip first run setup
-                         '--disable-background-timer-throttling', // Prevent background throttling
-                         '--disable-backgrounding-occluded-windows',
-                         '--disable-renderer-backgrounding'
-                     ],
-                     protocolTimeout: 18000000 // 300 minutes timeout for long background removal processing
-                 };
-
-                browser = await puppeteer.launch(launchOptions);
-                console.log('🚀 Launched new browser instance');
-            } catch (launchError) {
-                 console.error('❌ Failed to launch new browser:', launchError.message);
-                // If browser launch fails, set editor status back to available
-                try {
-                    const editorsPath = path.join(__dirname, 'editors.json');
-                    if (fs.existsSync(editorsPath)) {
-                        const editors = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
-                        const currentEditor = editors.find(editor => editor.url === editorUrl);
-                        if (currentEditor) {
-                            currentEditor.status = 'available';
-                            currentEditor.result = 'error';
-                            currentEditor.errorType = 'browser-launch-failed';
-                            fs.writeFileSync(editorsPath, JSON.stringify(editors, null, 4));
-                            console.log('📝 Editor status reset to available after browser launch failure');
-                        }
-                    }
-                } catch (statusError) {
-                    console.log('⚠️ Could not reset editor status after browser launch failure');
-                }
-                
-                throw new Error(`Failed to launch browser process: ${launchError.message}`);
+        // Function to connect to existing browser or launch a new one
+        async function getBrowserInstance(editorId) {
+            if (globalBrowser) {
+                console.log('🔄 Reusing existing browser instance');
+                return globalBrowser;
             }
+
+            // Try to connect to an existing browser via remote debugging
+            try {
+                const response = await fetch('http://localhost:9222/json/version');
+                const data = await response.json();
+                const webSocketDebuggerUrl = data.webSocketDebuggerUrl;
+                if (webSocketDebuggerUrl) {
+                    console.log('🔄 Connecting to existing browser via remote debugging');
+                    globalBrowser = await puppeteer.connect({ browserWSEndpoint: webSocketDebuggerUrl });
+                    return globalBrowser;
+                }
+            } catch (error) {
+                console.log('⚠️ No existing browser found via remote debugging, launching new instance');
+            }
+
+            // Launch browser with optimized settings for RDP
+            const launchOptions = {
+                headless: false,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-gpu',
+                    '--disable-dev-shm-usage',
+                    '--disable-extensions',
+                    '--no-first-run',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding',
+                    '--window-size=1920,1080',
+                    '--remote-debugging-port=9222'
+                ],
+                executablePath: process.env.CHROME_PATH || undefined,
+                userDataDir: path.join(__dirname, 'puppeteer_data'),
+                defaultViewport: null,
+                ignoreDefaultArgs: ['--disable-extensions']
+            };
+
+            try {
+                globalBrowser = await puppeteer.launch(launchOptions);
+                console.log('🚀 Launched new browser instance');
+            } catch (error) {
+                console.error('❌ Failed to launch new browser:', error.message);
+                if (editorId && editors[editorId]) {
+                    editors[editorId].result = 'error';
+                    saveEditors(editors);
+                    console.log('📝 Editor status set to error due to browser launch failure');
+                }
+                throw new Error(`Failed to launch browser process: ${error.message}`);
+            }
+
+            return globalBrowser;
         }
 
+        // Use the browser instance for new page
+        browser = await getBrowserInstance(editorUrl);
         page = await browser.newPage();
+        console.log('🌐 Created new tab for automation');
         
         // Set viewport to match reference app
         await page.setViewport({ width: 1280, height: 720 });
@@ -368,6 +375,9 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             ];
             
             let uploadBadgeFound = false;
+            let loadingElement = null;
+            
+            // Check for loading image with short timeout
             for (const selector of uploadBadgeSelectors) {
                 try {
                     console.log(`🔍 Testing upload badge selector: ${selector}`);
@@ -468,7 +478,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                 return true;
                             }
                         } catch (e) {
-                            console.log(`⚠️ Card selector failed: ${selector}`, e.message);
+                            console.log(`⚠️ Card selector failed: ${selector}`);
                         }
                     }
                     
@@ -815,9 +825,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 for (const switchBtn of allSwitches) {
                     // Skip switches in float-mode-panel-container
                     const floatModePanel = switchBtn.closest('#float-mode-panel-container');
-                    if (floatModePanel) {
-                        continue; // Skip this switch - it's not the background removal switch
-                    }
+                    if (floatModePanel) continue;
                     
                     const parent = switchBtn.closest('div');
                     if (parent) {
