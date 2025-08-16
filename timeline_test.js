@@ -30,8 +30,8 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             const editorsPath = path.join(__dirname, 'editors.json');
             if (fs.existsSync(editorsPath)) {
                 const editors = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
-                // Find an available editor and mark it as in-use
-                const availableEditor = editors.find(editor => editor.status === 'available');
+                // Find an available editor (not currently running) and mark it as in-use
+                const availableEditor = editors.find(editor => editor.result !== 'running');
                 if (availableEditor) {
                     editorUrl = availableEditor.url;
                     // Set editor status to "in-use" and record start time
