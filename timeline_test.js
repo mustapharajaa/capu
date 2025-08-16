@@ -94,7 +94,8 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 executablePath: process.env.CHROME_PATH || undefined,
                 userDataDir: path.join(__dirname, 'puppeteer_data'),
                 defaultViewport: null,
-                ignoreDefaultArgs: ['--disable-extensions']
+                ignoreDefaultArgs: ['--disable-extensions'],
+                protocolTimeout: 18000000 // Increased to 300 minutes to handle slow RDP environments
             };
 
             try {
@@ -523,6 +524,56 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             throw new Error('Failed to add video to timeline - all selector methods failed');
         }
 
+        // Enhanced error handling for DOM detachment during timeline addition
+        try {
+            console.log('🔄 Trying timeline addition method 1/2...');
+            await page.evaluate((videoName) => {
+                const videoElement = Array.from(document.querySelectorAll('div')).find(div => div.textContent.includes(videoName));
+                if (videoElement) {
+                    videoElement.scrollIntoView();
+                    videoElement.click();
+                    const timelineDropArea = document.querySelector('#timeline-container');
+                    if (timelineDropArea) {
+                        const rect = timelineDropArea.getBoundingClientRect();
+                        const x = rect.left + rect.width / 2;
+                        const y = rect.top + rect.height / 2;
+                        videoElement.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: x, clientY: y }));
+                        videoElement.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x, clientY: y }));
+                        videoElement.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: x, clientY: y }));
+                        return true;
+                    }
+                }
+                return false;
+            }, videoFileName);
+            console.log('✅ Video added to timeline successfully!');
+            return;
+        } catch (e) {
+            console.error('⚠️ Method 1 failed (DOM detachment):', e.message);
+            console.log('🔄 Trying timeline addition method 2/2...');
+            // Retry with a delay to allow DOM to stabilize
+            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+            try {
+                const result = await page.evaluate(() => {
+                    const timelineDropArea = document.querySelector('#timeline-container');
+                    if (timelineDropArea) {
+                        timelineDropArea.click();
+                        return true;
+                    }
+                    return false;
+                });
+                if (result) {
+                    console.log('✅ Video added to timeline using fallback method!');
+                    return;
+                } else {
+                    console.error('❌ Failed to add video to timeline - all methods exhausted');
+                    throw new Error('Failed to add video to timeline');
+                }
+            } catch (retryError) {
+                console.error('❌ Retry failed:', retryError.message);
+                throw new Error('Failed to add video to timeline after retry');
+            }
+        }
+
         // Monitor for video loading completion (if loading image appears)
         console.log('🔍 Checking for video loading indicator...');
         if (progressCallback) progressCallback('🔍 Checking for video loading...');
@@ -806,7 +857,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     }
                 }
 
-                // Method 2: Find by cutout-specific selectors (avoid float-mode-panel)
+                // Method 2: Find by cutout-specific selectors (exclude float-mode-panel)
                 const directSelectors = [
                     '#cutout-switch button[role="switch"]',
                     '[data-testid="cutout-switch"] button[role="switch"]',
@@ -820,7 +871,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     }
                 }
 
-                // Method 3: Find switch by nearby "Remove backgrounds automatically" text (exclude float-mode-panel)
+                // Method 3: Find switch by nearby text (exclude float-mode-panel)
                 const allSwitches = Array.from(document.querySelectorAll('button[role="switch"]'));
                 for (const switchBtn of allSwitches) {
                     // Skip switches in float-mode-panel-container
