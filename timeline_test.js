@@ -55,19 +55,28 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         // Try to connect to existing browser first, or launch new one
         console.log('🔍 Attempting to connect to existing browser on port 9222...');
         try {
-            // Try to connect to existing browser instance
-            console.log('🔗 Connecting to http://localhost:9222...');
-            const existingBrowsers = await puppeteer.connect({
-                browserURL: 'http://localhost:9222',
-                defaultViewport: null
-            });
-            browser = existingBrowsers;
-            console.log('✅ Successfully connected to existing browser instance');
-            
-            // Add extra delay for concurrent automations to prevent DOM conflicts
-            const randomDelay = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds
-            console.log(`⏳ Adding ${randomDelay/1000}s random delay to prevent DOM conflicts...`);
-            await new Promise(resolve => setTimeout(resolve, randomDelay));
+            // Alternative connection method: try to get browser endpoint directly
+            console.log('🔗 Fetching browser endpoint from http://localhost:9222/json/version...');
+            const response = await fetch('http://localhost:9222/json/version');
+            if (response.ok) {
+                const versionInfo = await response.json();
+                console.log('✅ Browser endpoint accessible, connecting via WebSocket...');
+                
+                // Connect using the WebSocket endpoint directly
+                const existingBrowsers = await puppeteer.connect({
+                    browserWSEndpoint: versionInfo.webSocketDebuggerUrl,
+                    defaultViewport: null
+                });
+                browser = existingBrowsers;
+                console.log('✅ Successfully connected to existing browser via WebSocket');
+                
+                // Add extra delay for concurrent automations to prevent DOM conflicts
+                const randomDelay = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds
+                console.log(`⏳ Adding ${randomDelay/1000}s random delay to prevent DOM conflicts...`);
+                await new Promise(resolve => setTimeout(resolve, randomDelay));
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
             
         } catch (connectError) {
             console.log('❌ Failed to connect to existing browser:', connectError.message);
@@ -1389,4 +1398,5 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 module.exports = {
     runSimpleUpload
 };
+
 
