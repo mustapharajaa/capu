@@ -170,10 +170,30 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         console.log(`✅ Using editor: ${editorUrl.substring(0, 50)}...`);
 
         console.log('🌐 Loading CapCut...');
-        await page.goto(editorUrl, { 
-            waitUntil: 'networkidle2',
-            timeout: 420000  // 7 minutes for very slow CapCut loading
-        });
+        console.log(`🔗 Navigating to: ${editorUrl}`);
+        
+        try {
+            await page.goto(editorUrl, { 
+                waitUntil: 'networkidle2',
+                timeout: 420000  // 7 minutes for very slow CapCut loading
+            });
+            console.log('✅ Page navigation completed successfully');
+        } catch (navigationError) {
+            console.error('❌ Page navigation failed:', navigationError.message);
+            console.log(`🔗 Failed URL: ${editorUrl}`);
+            console.log('🔄 Retrying navigation with different wait condition...');
+            
+            try {
+                await page.goto(editorUrl, { 
+                    waitUntil: 'load',
+                    timeout: 300000  // 5 minutes with simpler wait condition
+                });
+                console.log('✅ Page navigation completed on retry');
+            } catch (retryError) {
+                console.error('❌ Page navigation failed on retry:', retryError.message);
+                throw new Error(`Failed to navigate to CapCut editor: ${retryError.message}`);
+            }
+        }
 
         if (progressCallback) progressCallback('📄 Page loaded, waiting for timeline...');
 
