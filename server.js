@@ -209,6 +209,98 @@ app.get('/videos', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'videos.html'));
 });
 
+// --- Page for updating cookies ---
+app.get('/go', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'go.html'));
+});
+
+// --- API for getting and setting cookies ---
+app.get('/api/cookies', (req, res) => {
+    const cookiesPath = path.join(__dirname, 'youtube-cookies.txt');
+    if (fs.existsSync(cookiesPath)) {
+        // Set content type to plain text to avoid browser rendering issues
+        res.type('text/plain');
+        res.sendFile(cookiesPath);
+    } else {
+        // Send empty string if file doesn't exist, so the textarea is just empty
+        res.status(200).send('');
+    }
+});
+
+app.post('/api/cookies', (req, res) => {
+    const { cookies } = req.body;
+    if (typeof cookies !== 'string') {
+        return res.status(400).json({ success: false, message: 'Invalid cookie data.' });
+    }
+
+    const cookiesPath = path.join(__dirname, 'youtube-cookies.txt');
+    fs.writeFile(cookiesPath, cookies, (err) => {
+        if (err) {
+            console.error('Error saving cookies:', err);
+            return res.status(500).json({ success: false, message: 'Failed to save cookie file.' });
+        }
+        console.log('🍪 YouTube cookies file updated successfully.');
+        res.json({ success: true, message: 'Cookies saved successfully!' });
+    });
+});
+
+app.post('/api/editors', (req, res) => {
+    const { editors } = req.body;
+    if (!editors) {
+        return res.status(400).json({ success: false, message: 'Invalid editors data.' });
+    }
+
+    const editorsPath = path.join(__dirname, 'editors.json');
+    // Pretty print the JSON with an indent of 2 spaces
+    const editorsString = JSON.stringify(editors, null, 2);
+
+    fs.writeFile(editorsPath, editorsString, (err) => {
+        if (err) {
+            console.error('Error saving editors.json:', err);
+            return res.status(500).json({ success: false, message: 'Failed to save editors.json.' });
+        }
+        console.log('📝 editors.json file updated successfully via API.');
+        res.json({ success: true, message: 'Editors file saved successfully!' });
+    });
+});
+
+app.get('/api/editors', (req, res) => {
+    const editorsPath = path.join(__dirname, 'editors.json');
+    if (fs.existsSync(editorsPath)) {
+        res.sendFile(editorsPath);
+    } else {
+        res.status(404).json({ success: false, message: 'editors.json not found.' });
+    }
+});
+
+// --- API for getting and setting new videos queue ---
+app.get('/api/new-videos', (req, res) => {
+    const newVideosPath = path.join(__dirname, 'new videos');
+    if (fs.existsSync(newVideosPath)) {
+        res.type('text/plain');
+        res.sendFile(newVideosPath);
+    } else {
+        res.status(200).send(''); // Send empty if it doesn't exist
+    }
+});
+
+app.post('/api/new-videos', (req, res) => {
+    const { videos } = req.body;
+    if (typeof videos !== 'string') {
+        return res.status(400).json({ success: false, message: 'Invalid data for new videos file.' });
+    }
+
+    const newVideosPath = path.join(__dirname, 'new videos');
+    fs.writeFile(newVideosPath, videos, (err) => {
+        if (err) {
+            console.error('Error saving new videos file:', err);
+            return res.status(500).json({ success: false, message: 'Failed to save new videos file.' });
+        }
+        console.log('📹 New videos queue file updated successfully via API.');
+        res.json({ success: true, message: 'Video queue saved successfully!' });
+    });
+});
+
 // YouTube download routes
 app.post('/youtube/info', async (req, res) => {
     try {
@@ -354,8 +446,11 @@ app.post('/create-video', async (req, res) => {
 });
 
 // --- Server Start ---
-const server = app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
+const server = app.listen(port, '0.0.0.0', () => {
+    console.log(`🌐 Server is running on http://localhost:${port}`);
+    console.log(`🌍 Web app accessible at: http://0.0.0.0:${port}`);
+    console.log(`📱 Management page: http://localhost:${port}/go`);
+    console.log('🔗 Server is now accessible from any IP address!');
     console.log('Open your browser and navigate to the URL to start.');
 });
 

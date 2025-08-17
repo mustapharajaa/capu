@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update YouTube Cookies</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; color: #1c1e21; margin: 0; padding: 40px; }
+        .container { max-width: 800px; margin: 0 auto; background-color: #fff; padding: 20px 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { font-size: 24px; margin-bottom: 20px; }
+        textarea { width: 100%; height: 400px; padding: 10px; border: 1px solid #dddfe2; border-radius: 6px; font-family: monospace; font-size: 14px; resize: vertical; margin-bottom: 15px; }
+        button { background-color: #1877f2; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #166fe5; }
+        .status { margin-top: 15px; font-weight: bold; }
+        .status.success { color: #31a24c; }
+        .status.error { color: #fa383e; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Update YouTube Cookies</h1>
+        <p>Paste the contents of your exported <code>cookies.txt</code> file below and click save.</p>
+        <textarea id="cookies-textarea" placeholder="# Netscape HTTP Cookie File..."></textarea>
+        <button id="save-button">Save Cookies</button>
+        <div id="cookies-status-message" class="status"></div>
+    </div>
+
+    <div class="container" style="margin-top: 30px;">
+        <h1>Manage Editors Status</h1>
+        <p>View and edit <code>editors.json</code> to monitor and manage automation status.</p>
+        <textarea id="editors-textarea"></textarea>
+        <button id="save-editors-button">Save Editors</button>
+        <button id="refresh-editors-button">Refresh</button>
+        <label style="margin-left: 15px;">
+            <input type="checkbox" id="auto-refresh-editors-checkbox">
+            Auto-Refresh (5s)
+        </label>
+        <div id="editors-status-message" class="status"></div>
+    </div>
+
+    <div class="container" style="margin-top: 30px;">
+        <h1>Manage Video Queue</h1>
+        <p>View and edit the <code>new videos</code> file to manage the download queue.</p>
+        <textarea id="new-videos-textarea"></textarea>
+        <button id="save-new-videos-button">Save Queue</button>
+        <button id="refresh-new-videos-button">Refresh</button>
+        <label style="margin-left: 15px;">
+            <input type="checkbox" id="auto-refresh-new-videos-checkbox">
+            Auto-Refresh (5s)
+        </label>
+        <div id="new-videos-status-message" class="status"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Generic Fetch and Save Functions ---
+            async function loadContent(url, textarea, statusEl, isJson = false) {
+                if (document.activeElement === textarea) return; // Don't refresh if user is typing
+                statusEl.textContent = 'Loading...';
+                statusEl.className = 'status';
+                try {
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const text = await response.text();
+                        textarea.value = isJson ? JSON.stringify(JSON.parse(text), null, 2) : text;
+                        statusEl.textContent = 'Loaded successfully.';
+                        statusEl.className = 'status success';
+                    } else {
+                        statusEl.textContent = `Could not load file. Status: ${response.status}`;
+                        statusEl.className = 'status error';
+                    }
+                } catch (error) {
+                    statusEl.textContent = `Error loading file: ${error.message}`;
+                    statusEl.className = 'status error';
+                }
+            }
+
+            async function saveContent(url, textarea, statusEl, bodyKey, isJson = false) {
+                statusEl.textContent = 'Saving...';
+                statusEl.className = 'status';
+                let data;
+                try {
+                    if (isJson) {
+                        data = JSON.parse(textarea.value); // Validate JSON
+                    } else {
+                        data = textarea.value;
+                    }
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ [bodyKey]: data })
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        statusEl.textContent = result.message;
+                        statusEl.className = 'status success';
+                    } else {
+                        statusEl.textContent = `Error: ${result.message}`;
+                        statusEl.className = 'status error';
+                    }
+                } catch (error) {
+                    statusEl.textContent = `Save failed: ${isJson ? 'Invalid JSON format. ' : ''}${error.message}`;
+                    statusEl.className = 'status error';
+                }
+            }
+
+            function setupAutoRefresh(checkbox, refreshFn, statusEl) {
+                let intervalId;
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) {
+                        intervalId = setInterval(refreshFn, 5000);
+                        statusEl.textContent = 'Auto-refresh enabled.';
+                        statusEl.className = 'status';
+                    } else {
+                        clearInterval(intervalId);
+                        statusEl.textContent = 'Auto-refresh disabled.';
+                        statusEl.className = 'status';
+                    }
+                });
+            }
+
+            // --- Section Initializations ---
+
+            // Cookies Section
+            const cookiesTextarea = document.getElementById('cookies-textarea');
+            const saveCookiesButton = document.getElementById('save-button');
+            const cookiesStatus = document.getElementById('cookies-status-message');
+            saveCookiesButton.addEventListener('click', () => saveContent('/api/cookies', cookiesTextarea, cookiesStatus, 'cookies'));
+            loadContent('/api/cookies', cookiesTextarea, cookiesStatus);
+
+            // Editors Section
+            const editorsTextarea = document.getElementById('editors-textarea');
+            const saveEditorsButton = document.getElementById('save-editors-button');
+            const refreshEditorsButton = document.getElementById('refresh-editors-button');
+            const autoRefreshEditorsCheckbox = document.getElementById('auto-refresh-editors-checkbox');
+            const editorsStatus = document.getElementById('editors-status-message');
+            const loadEditors = () => loadContent('/api/editors', editorsTextarea, editorsStatus, true);
+            saveEditorsButton.addEventListener('click', () => saveContent('/api/editors', editorsTextarea, editorsStatus, 'editors', true));
+            refreshEditorsButton.addEventListener('click', loadEditors);
+            setupAutoRefresh(autoRefreshEditorsCheckbox, loadEditors, editorsStatus);
+            loadEditors();
+
+            // New Videos Section
+            const newVideosTextarea = document.getElementById('new-videos-textarea');
+            const saveNewVideosButton = document.getElementById('save-new-videos-button');
+            const refreshNewVideosButton = document.getElementById('refresh-new-videos-button');
+            const autoRefreshNewVideosCheckbox = document.getElementById('auto-refresh-new-videos-checkbox');
+            const newVideosStatus = document.getElementById('new-videos-status-message');
+            const loadNewVideos = () => loadContent('/api/new-videos', newVideosTextarea, newVideosStatus);
+            saveNewVideosButton.addEventListener('click', () => saveContent('/api/new-videos', newVideosTextarea, newVideosStatus, 'videos'));
+            refreshNewVideosButton.addEventListener('click', loadNewVideos);
+            setupAutoRefresh(autoRefreshNewVideosCheckbox, loadNewVideos, newVideosStatus);
+            loadNewVideos();
+        });
+    </script>
+</body>
+</html>

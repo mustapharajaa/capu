@@ -20,6 +20,16 @@ edit cookies.json.exemple for login capcut error
 npm run start
 ```
 
+⚠️ cookies ⚠️
+1, Open a new private browsing/incognito window and log into YouTube
+2, navigate to https://www.youtube.com/robots.txt (this should be the only private/incognito browsing tab open)
+3, Export youtube.com cookies from the browser, then close the private browsing/incognito window so that the session is never opened in the browser again.
+
+
+
+
+
+
 Open: http://localhost:3000
 
 ## 📋 Features

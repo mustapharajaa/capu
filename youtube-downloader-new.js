@@ -47,30 +47,34 @@ async function downloadYouTubeVideo(url, progressCallback) {
     return new Promise(async (resolve, reject) => {
         try {
             const timestamp = Date.now();
+            const cookiesPath = path.join(__dirname, 'youtube-cookies.txt');
 
             // Get video metadata first to get the title for the filename
-            console.log('Fetching video metadata using browser cookies...');
-
-            const metadataArgs = [
-                '--dump-json',
-                '--cookies-from-browser', 'chrome,edge,firefox',
-                url
-            ];
-
-            let metadataOutput = '';
-            await new Promise((resolveExec, rejectExec) => {
-                ytDlpWrap.exec(metadataArgs)
-                    .on('stdout', (data) => { metadataOutput += data; })
-                    .on('error', rejectExec)
-                    .on('close', resolveExec);
-            });
-
-            const metadata = JSON.parse(metadataOutput);
-            console.log('Successfully fetched metadata.');
-
+            console.log('Fetching video metadata...');
+            let metadata;
+            
+            // Use spawn to get metadata with cookies (like reference app)
+            if (fs.existsSync(cookiesPath)) {
+                console.log('🍪 Using YouTube cookies for authentication');
+                const metadataArgs = [
+                    '--dump-json',
+                    '--cookies', cookiesPath,
+                    url
+                ];
+                console.log(`Executing: ${YTDLP_BINARY_PATH} ${metadataArgs.join(' ')}`);
+                
+                const { execSync } = require('child_process');
+                const metadataOutput = execSync(`"${YTDLP_BINARY_PATH}" --dump-json --cookies "${cookiesPath}" "${url}"`, { encoding: 'utf8' });
+                metadata = JSON.parse(metadataOutput);
+            } else {
+                console.log('⚠️ No cookies file - metadata fetch may fail due to bot detection');
+                metadata = await ytDlpWrap.getVideoInfo(url);
+            }
             const sanitizedTitle = sanitizeFilename(metadata.title);
 
+            // No timestamp - clean filename as requested
             const outputFilename = `${sanitizedTitle}.mp4`;
+            
             const outputPath = path.join(UPLOADS_DIR, outputFilename);
             const infoJsonPath = path.join(UPLOADS_DIR, `${sanitizedTitle}.info.json`);
 
@@ -78,7 +82,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
             fs.writeFileSync(infoJsonPath, JSON.stringify(metadata, null, 2));
             console.log(`Saved .info.json to ${infoJsonPath}`);
 
-            // Define the arguments for yt-dlp
+            // Use EXACT same format as reference app
             const ytdlpArgs = [
                 '--format', 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
                 '--output', outputPath,
@@ -86,9 +90,15 @@ async function downloadYouTubeVideo(url, progressCallback) {
                 '--write-info-json',
                 '--ffmpeg-location', FFMPEG_PATH,
                 '--merge-output-format', 'mp4',
-                '--postprocessor-args', 'ffmpeg:-c:v copy -c:a aac -strict -2',
-                '--cookies-from-browser', 'chrome,edge,firefox' // Use browser cookies
+                '--postprocessor-args', 'ffmpeg:-c:v copy -c:a aac -strict -2'
             ];
+            
+            // Add cookies if file exists (EXACTLY like reference app)
+            if (fs.existsSync(cookiesPath)) {
+                ytdlpArgs.push('--cookies', cookiesPath);
+            } else {
+                console.log('⚠️ No cookies file found - downloads may be limited by bot detection');
+            }
             
             ytdlpArgs.push(url);
 
