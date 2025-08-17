@@ -83,27 +83,26 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 console.log('⚠️ No existing browser found via remote debugging, launching new instance');
             }
 
-            // Launch browser with optimized settings for RDP
+            // Launch browser with minimal settings for RDP automation
             const launchOptions = {
-                headless: false,
+                headless: false, // Must stay visible for RDP automation
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
-                    '--disable-gpu',
-                    '--disable-dev-shm-usage',
                     '--disable-extensions',
                     '--no-first-run',
                     '--disable-background-timer-throttling',
                     '--disable-backgrounding-occluded-windows',
                     '--disable-renderer-backgrounding',
-                    '--window-size=1920,1080',
-                    '--remote-debugging-port=9222'
+                    '--remote-debugging-port=9222',
+                    '--disable-dev-shm-usage',
+                    '--start-maximized'
                 ],
                 executablePath: process.env.CHROME_PATH || undefined,
                 userDataDir: path.join(__dirname, 'puppeteer_data'),
                 defaultViewport: null,
                 ignoreDefaultArgs: ['--disable-extensions'],
-                protocolTimeout: 18000000 // Increased to 300 minutes to handle slow RDP environments
+                protocolTimeout: 18000000 // 300 minutes for slow RDP environments
             };
 
             try {
@@ -126,6 +125,90 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         browser = await getBrowserInstance(editorUrl);
         page = await browser.newPage();
         console.log('🌐 Created new tab for automation');
+        
+        // Ensure browser window is maximized and visible
+        try {
+            // Force window to maximize and focus
+            await page.evaluate(() => {
+                // Force window focus
+                window.focus();
+                // Maximize window to full screen
+                if (window.screen && window.resizeTo && window.moveTo) {
+                    window.resizeTo(window.screen.availWidth, window.screen.availHeight);
+                    window.moveTo(0, 0);
+                }
+                // Ensure window is not minimized
+                if (document.hidden) {
+                    document.dispatchEvent(new Event('visibilitychange'));
+                }
+            });
+            
+            // Bring to front
+            await page.bringToFront();
+            console.log('✅ Browser window maximized to full screen and brought to front');
+        } catch (error) {
+            console.log('⚠️ Could not ensure window visibility:', error.message);
+        }
+        
+        // RDP-compatible helper functions for reliable interactions
+        async function rdpSafeClick(selector, options = {}) {
+            const element = await page.waitForSelector(selector, { visible: true, timeout: 30000, ...options });
+            
+            // Ensure browser window is focused and visible
+            await page.bringToFront();
+            await page.evaluate(() => window.focus());
+            
+            // Multiple click methods for RDP compatibility
+            try {
+                // Method 1: Standard click
+                await element.click();
+                console.log(`✅ Successfully clicked: ${selector}`);
+                return true;
+            } catch (error1) {
+                console.log(`⚠️ Standard click failed, trying evaluate click...`);
+                try {
+                    // Method 2: JavaScript click via evaluate
+                    await page.evaluate((sel) => {
+                        const el = document.querySelector(sel);
+                        if (el) {
+                            el.click();
+                            return true;
+                        }
+                        return false;
+                    }, selector);
+                    console.log(`✅ Successfully clicked via evaluate: ${selector}`);
+                    return true;
+                } catch (error2) {
+                    console.log(`⚠️ Evaluate click failed, trying coordinate click...`);
+                    try {
+                        // Method 3: Coordinate-based click
+                        const box = await element.boundingBox();
+                        if (box) {
+                            await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+                            console.log(`✅ Successfully clicked via coordinates: ${selector}`);
+                            return true;
+                        }
+                    } catch (error3) {
+                        console.error(`❌ All click methods failed for ${selector}:`, error3.message);
+                        throw error3;
+                    }
+                }
+            }
+        }
+        
+        async function ensureBrowserFocus() {
+            try {
+                await page.bringToFront();
+                await page.evaluate(() => {
+                    window.focus();
+                    document.body.focus();
+                });
+                // Small delay to ensure focus is applied
+                await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (error) {
+                console.log('⚠️ Could not ensure browser focus:', error.message);
+            }
+        }
         
         // Set viewport to match reference app
         await page.setViewport({ width: 1280, height: 720 });
@@ -199,27 +282,45 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         // Click the main 'Upload' button using reference app selector
         console.log('📤 Finding main Upload button...');
         const uploadButtonSelector = 'span[data-ssr-i18n-key="uploa_web_d"]';
-        await page.waitForSelector(uploadButtonSelector, { visible: true, timeout: 30000 });
         console.log('✅ Clicking main Upload button...');
-        await page.click(uploadButtonSelector);
+        await rdpSafeClick(uploadButtonSelector);
 
         // Initiate the file chooser using reference app method
         console.log('📁 Opening file chooser...');
+        
+        // Ensure browser is focused before file chooser interaction
+        await ensureBrowserFocus();
+        
         const [fileChooser] = await Promise.all([
             page.waitForFileChooser({ timeout: 300000 }),  // 5 minutes
-            // Robust way to click the 'Upload file' button inside the panel
-            page.evaluate(() => {
-                const buttons = Array.from(document.querySelectorAll('span'));
-                const uploadFileButton = buttons.find(el => el.textContent.trim() === 'Upload file');
-                if (uploadFileButton) {
-                    uploadFileButton.click();
-                } else {
-                    // Fallback for different structures
-                    const uploadArea = document.querySelector('div[class*="upload-item-content"]');
-                    if (uploadArea) uploadArea.click();
-                    else throw new Error('Could not find the \'Upload file\' button or area.');
+            // RDP-compatible way to click the 'Upload file' button inside the panel
+            (async () => {
+                // First try to find and click using text content
+                try {
+                    const uploadFileSpan = await page.evaluate(() => {
+                        const buttons = Array.from(document.querySelectorAll('span'));
+                        const uploadFileButton = buttons.find(el => el.textContent.trim() === 'Upload file');
+                        if (uploadFileButton) {
+                            uploadFileButton.click();
+                            return true;
+                        }
+                        return false;
+                    });
+                    
+                    if (!uploadFileSpan) {
+                        // Fallback: try upload area selector
+                        const uploadAreaSelector = 'div[class*="upload-item-content"]';
+                        try {
+                            await rdpSafeClick(uploadAreaSelector);
+                        } catch (error) {
+                            throw new Error('Could not find the \'Upload file\' button or area.');
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ File chooser click failed:', error.message);
+                    throw error;
                 }
-            })
+            })()
         ]);
 
         await fileChooser.accept([videoPath]);

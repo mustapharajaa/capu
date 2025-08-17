@@ -11,12 +11,13 @@ in terminal not shell RUN THIS COMMANDS
 .\setup.bat
 npm cache clean --force
 npm install
-node setup.js
-add your .env.exemple details to .env paths it auto update
-edite editors.json and new videos file
-edite youtube-cookies.txt 
-edite google sheet key file  capcut-sheet-service-account.json
-edit cookies.json.exemple for login capcut error
+node setup.js 
+
+1, add your .env.exemple details to .env paths it auto update
+2, edite google sheet key file  capcut-sheet-service-account.json
+3, edit cookies.json.exemple for login capcut error
+    ^in localhost:3000/go or rdpip/go^
+4, editors.json & new videos & youtube-cookies.txt 
 npm run start
 ```
 
@@ -26,7 +27,9 @@ npm run start
 3, Export youtube.com cookies from the browser, then close the private browsing/incognito window so that the session is never opened in the browser again.
 
 
+run rdp app in public commond
 
+netsh advfirewall firewall add rule name="CapCut Automation Port 3000" dir=in action=allow protocol=TCP localport=3000
 
 
 
