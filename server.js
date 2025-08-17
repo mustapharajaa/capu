@@ -19,7 +19,8 @@ function getRunningAutomationsCount() {
             return 0;
         }
 
-        const editors = JSON.parse(fs.readFileSync(editorsFile, 'utf8'));
+        const editorsData = JSON.parse(fs.readFileSync(editorsFile, 'utf8'));
+        const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
         const runningAutomations = editors.filter(editor => editor.result === 'running');
         return runningAutomations.length;
     } catch (error) {
@@ -445,14 +446,185 @@ app.post('/create-video', async (req, res) => {
     res.json({ success: true, message: 'Use /upload endpoint for video processing.' });
 });
 
+// Smart cache rotation: keep CapCut data, remove oldest cache
+async function rotateOldCache(puppeteerDataPath) {
+    try {
+        const { execSync } = require('child_process');
+        
+        // Keep only essential login data, remove most cache for minimal storage
+        const dirsToKeepEssential = [
+            'Default/Local Storage',
+            'Default/Session Storage',
+            'Default/Cookies',
+            'Default/Preferences',
+            'Default/Web Data',
+            'Safe Browsing'
+        ];
+        
+        const dirsToCleanMost = [
+            'Default/IndexedDB',      // 304MB - keep only 10%
+            'Default/Service Worker', // 54MB - keep only 10%
+            'Default/Cache',          // 29MB - keep only 10%
+            'Default/GPUCache',       // 4MB - keep only 20%
+            'Default/DawnCache',
+            'Default/Code Cache',
+            'ShaderCache',
+            'GrShaderCache',
+            'GraphiteDawnCache'
+        ];
+        
+        // Clean most cache files, keep only essential login data + minimal performance cache
+        dirsToCleanMost.forEach(cacheDir => {
+            const fullCachePath = path.join(puppeteerDataPath, cacheDir);
+            if (fs.existsSync(fullCachePath)) {
+                try {
+                    // Get all files and sort by modification time (newest first)
+                    const files = fs.readdirSync(fullCachePath);
+                    const fileStats = files.map(file => {
+                        const filePath = path.join(fullCachePath, file);
+                        const stats = fs.statSync(filePath);
+                        return { file, path: filePath, mtime: stats.mtime };
+                    }).sort((a, b) => b.mtime - a.mtime); // Newest first
+                    
+                    // Keep different percentages based on directory importance
+                    let keepPercentage = 0.1; // Default: keep 10%
+                    if (cacheDir.includes('GPUCache')) keepPercentage = 0.2; // Keep 20% for graphics
+                    if (cacheDir.includes('IndexedDB')) keepPercentage = 0.05; // Keep only 5% of largest cache
+                    
+                    const filesToKeep = Math.floor(fileStats.length * keepPercentage);
+                    
+                    // Remove all but the newest files
+                    for (let i = filesToKeep; i < fileStats.length; i++) {
+                        try {
+                            if (fs.statSync(fileStats[i].path).isDirectory()) {
+                                if (process.platform === 'win32') {
+                                    execSync(`rmdir /s /q "${fileStats[i].path}"`, { stdio: 'ignore' });
+                                } else {
+                                    execSync(`rm -rf "${fileStats[i].path}"`, { stdio: 'ignore' });
+                                }
+                            } else {
+                                fs.unlinkSync(fileStats[i].path);
+                            }
+                        } catch (e) {
+                            // Silent fail for individual file cleanup
+                        }
+                    }
+                } catch (e) {
+                    // Silent fail for directory processing
+                }
+            }
+        });
+        
+        // Also clean some non-essential directories completely
+        const nonEssentialDirs = [
+            'Crashpad',
+            'segmentation_platform'
+        ];
+        
+        nonEssentialDirs.forEach(dir => {
+            const fullPath = path.join(puppeteerDataPath, dir);
+            if (fs.existsSync(fullPath)) {
+                try {
+                    if (process.platform === 'win32') {
+                        execSync(`rmdir /s /q "${fullPath}"`, { stdio: 'ignore' });
+                    } else {
+                        execSync(`rm -rf "${fullPath}"`, { stdio: 'ignore' });
+                    }
+                } catch (e) {
+                    // Silent fail
+                }
+            }
+        });
+        
+        console.log('🔄 Rotated old cache files (kept newest CapCut data & cookies)');
+    } catch (error) {
+        console.log('⚠️ Could not rotate cache:', error.message);
+    }
+}
+
 // --- Server Start ---
-const server = app.listen(port, '0.0.0.0', () => {
+const server = app.listen(port, '0.0.0.0', async () => {
     console.log(`🌐 Server is running on http://localhost:${port}`);
     console.log(`🌍 Web app accessible at: http://0.0.0.0:${port}`);
     console.log(`📱 Management page: http://localhost:${port}/go`);
     console.log('🔗 Server is now accessible from any IP address!');
     console.log('Open your browser and navigate to the URL to start.');
+    
+    // Clean all video files and temp files on restart
+    try {
+        // Clean uploads folder
+        const uploadFiles = fs.readdirSync('uploads');
+        uploadFiles.forEach(file => {
+            if (file.endsWith('.mp4') || file.endsWith('.info.json')) {
+                fs.unlinkSync(`uploads/${file}`);
+            }
+        });
+        // Clean temp folder
+        const tempFiles = fs.readdirSync('temp');
+        tempFiles.forEach(file => {
+            if (file.endsWith('.tmp')) {
+                fs.unlinkSync(`temp/${file}`);
+            }
+        });
+        
+        // Smart cache rotation: keep CapCut cache/cookies, remove oldest cache
+        const puppeteerDataPath = path.join(__dirname, 'puppeteer_data');
+        if (fs.existsSync(puppeteerDataPath)) {
+            try {
+                await rotateOldCache(puppeteerDataPath);
+                console.log('🔄 Smart cache rotation: kept CapCut data, removed oldest cache');
+            } catch (cleanupError) {
+                console.log('⚠️ Could not rotate cache:', cleanupError.message);
+            }
+        }
+    } catch(e) {}
+    
+    // Set up periodic cleanup for puppeteer_data to prevent 1GB+ growth
+    setInterval(async () => {
+        try {
+            const puppeteerDataPath = path.join(__dirname, 'puppeteer_data');
+            if (fs.existsSync(puppeteerDataPath)) {
+                const stats = fs.statSync(puppeteerDataPath);
+                const sizeInMB = getDirectorySize(puppeteerDataPath) / (1024 * 1024);
+                
+                // Smart cache rotation if directory is larger than 200MB
+                if (sizeInMB > 200) {
+                    console.log(`🔄 Puppeteer data directory is ${sizeInMB.toFixed(0)}MB, rotating old cache...`);
+                    try {
+                        await rotateOldCache(puppeteerDataPath);
+                        console.log('🔄 Smart cache rotation completed (kept CapCut data, newest cookies)');
+                    } catch (cleanupError) {
+                        console.log('⚠️ Could not rotate cache:', cleanupError.message);
+                    }
+                }
+            }
+        } catch (error) {
+            // Silent fail for periodic cleanup
+        }
+    }, 10 * 60 * 1000); // Check every 10 minutes
+    
+    console.log('⏰ Periodic puppeteer_data cleanup scheduled every 10 minutes (cleans if >200MB)');
 });
+
+// Helper function to calculate directory size
+function getDirectorySize(dirPath) {
+    let totalSize = 0;
+    try {
+        const files = fs.readdirSync(dirPath);
+        for (const file of files) {
+            const filePath = path.join(dirPath, file);
+            const stats = fs.statSync(filePath);
+            if (stats.isDirectory()) {
+                totalSize += getDirectorySize(filePath);
+            } else {
+                totalSize += stats.size;
+            }
+        }
+    } catch (error) {
+        // Silent fail for size calculation
+    }
+    return totalSize;
+}
 
 // --- Graceful Shutdown ---
 async function cleanupBrowser() {

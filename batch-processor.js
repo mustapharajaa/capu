@@ -148,7 +148,8 @@ class BatchProcessor {
                 return false;
             }
 
-            const editors = JSON.parse(fs.readFileSync(this.editorsFile, 'utf8'));
+            const editorsData = JSON.parse(fs.readFileSync(this.editorsFile, 'utf8'));
+            const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
             const availableEditors = editors.filter(editor => editor.status === 'available');
             
             console.log(`📊 Editor availability: ${availableEditors.length}/${editors.length} available`);
@@ -233,7 +234,8 @@ class BatchProcessor {
                 return 0;
             }
 
-            const editors = JSON.parse(fs.readFileSync(this.editorsFile, 'utf8'));
+            const editorsData = JSON.parse(fs.readFileSync(this.editorsFile, 'utf8'));
+            const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
             const availableEditors = editors.filter(editor => 
                 editor.status === 'available' && editor.result !== 'running'
             );
@@ -256,7 +258,8 @@ class BatchProcessor {
                 return 0;
             }
 
-            const editors = JSON.parse(fs.readFileSync(this.editorsFile, 'utf8'));
+            const editorsData = JSON.parse(fs.readFileSync(this.editorsFile, 'utf8'));
+            const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
             
             const runningEditors = editors.filter(editor => editor.result === 'running');
             

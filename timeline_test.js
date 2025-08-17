@@ -13,8 +13,83 @@ const googleSheets = new GoogleSheetsService();
 // User data directory for persistent browser sessions (like reference app)
 const USER_DATA_DIR = path.join(__dirname, 'puppeteer_data');
 
+// Global variables for tab switching
+let runningEditorTabs = new Map(); // Map of editorId -> page
+let tabSwitchingInterval = null;
+
 // Global browser instance for reuse
 let globalBrowser = null;
+
+// Note: CapCut cookies and cache are preserved in puppeteer_data directory
+// Smart cache rotation keeps newest cookies automatically
+
+// Tab switching management functions
+function startTabSwitching() {
+    try {
+        const editorsPath = path.join(__dirname, 'editors.json');
+        if (!fs.existsSync(editorsPath)) return;
+        
+        const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
+        
+        // Check if editors.json has new structure with tabSwitching config
+        let tabSwitchingConfig;
+        if (editorsData.tabSwitching) {
+            tabSwitchingConfig = editorsData.tabSwitching;
+        } else {
+            // Default config for old structure
+            tabSwitchingConfig = { enabled: true, intervalSeconds: 10 };
+        }
+        
+        if (!tabSwitchingConfig.enabled || runningEditorTabs.size < 2) return;
+        
+        if (tabSwitchingInterval) clearInterval(tabSwitchingInterval);
+        
+        let currentTabIndex = 0;
+        
+        tabSwitchingInterval = setInterval(async () => {
+            const tabArray = Array.from(runningEditorTabs.values()); // Get fresh tab array each time
+            if (tabArray.length > 1) {
+                try {
+                    // Ensure currentTabIndex is within bounds
+                    if (currentTabIndex >= tabArray.length) {
+                        currentTabIndex = 0;
+                    }
+                    await tabArray[currentTabIndex].bringToFront();
+                    currentTabIndex = (currentTabIndex + 1) % tabArray.length;
+                } catch (error) {
+                    // Tab might be closed, ignore error
+                    console.log('🔄 Tab switching error (tab may be closed):', error.message);
+                }
+            }
+        }, tabSwitchingConfig.intervalSeconds * 1000);
+        
+        console.log(`🔄 Tab switching enabled: ${tabSwitchingConfig.intervalSeconds}s interval`);
+    } catch (error) {
+        console.log('⚠️ Tab switching setup failed:', error.message);
+    }
+}
+
+function stopTabSwitching() {
+    if (tabSwitchingInterval) {
+        clearInterval(tabSwitchingInterval);
+        tabSwitchingInterval = null;
+        console.log('⏹️ Tab switching stopped');
+    }
+}
+
+function addEditorTab(editorId, page) {
+    runningEditorTabs.set(editorId, page);
+    if (runningEditorTabs.size >= 2) {
+        startTabSwitching();
+    }
+}
+
+function removeEditorTab(editorId) {
+    runningEditorTabs.delete(editorId);
+    if (runningEditorTabs.size < 2) {
+        stopTabSwitching();
+    }
+}
 
 /**
  * Simple CapCut automation - Upload video and monitor for success
@@ -31,7 +106,11 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         try {
             const editorsPath = path.join(__dirname, 'editors.json');
             if (fs.existsSync(editorsPath)) {
-                const editors = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
+                const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
+                
+                // Handle both old array structure and new object structure
+                const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
+                
                 // Find an available editor and mark it as in-use
                 const availableEditor = editors.find(editor => editor.status === 'available');
                 if (availableEditor) {
@@ -40,7 +119,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     availableEditor.status = 'in-use';
                     availableEditor.lastRun = new Date().toISOString();
                     availableEditor.result = 'running'; // Will be updated to 'complete' or 'error' later
-                    fs.writeFileSync(editorsPath, JSON.stringify(editors, null, 4));
+                    fs.writeFileSync(editorsPath, JSON.stringify(editorsData, null, 4));
                     console.log('📝 Editor status set to "in-use"');
                     if (progressCallback) progressCallback('📝 Editor reserved for automation');
                 } else {
@@ -107,7 +186,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 
             try {
                 globalBrowser = await puppeteer.launch(launchOptions);
-                console.log('🚀 Launched new browser instance');
+                console.log('🚀 Launched new browser instance (CapCut cache & cookies preserved)');
             } catch (error) {
                 console.error('❌ Failed to launch new browser:', error.message);
                 if (editorId && editors[editorId]) {
@@ -125,6 +204,10 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         browser = await getBrowserInstance(editorUrl);
         page = await browser.newPage();
         console.log('🌐 Created new tab for automation');
+        
+        // Register this tab for switching if multiple automations are running
+        const editorId = editorUrl ? editorUrl.split('/editor/')[1]?.split('?')[0] : 'unknown';
+        addEditorTab(editorId, page);
         
         // Ensure browser window is maximized and visible
         try {
@@ -240,7 +323,8 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             
             if (fs.existsSync(editorsPath)) {
                 try {
-                    const editors = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
+                    const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
+                    const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
                     const availableEditors = editors.filter(editor => editor.status === 'available');
                     
                     if (availableEditors.length > 0) {
@@ -1358,11 +1442,12 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         try {
             const editorsPath = path.join(__dirname, 'editors.json');
             if (fs.existsSync(editorsPath)) {
-                const editors = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
+                const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
+                const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
                 const currentEditor = editors.find(editor => editor.url === editorUrl);
                 if (currentEditor) {
                     currentEditor.result = 'complete';
-                    fs.writeFileSync(editorsPath, JSON.stringify(editors, null, 4));
+                    fs.writeFileSync(editorsPath, JSON.stringify(editorsData, null, 4));
                 }
             }
         } catch (updateError) {
@@ -1392,12 +1477,13 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         try {
             const editorsPath = path.join(__dirname, 'editors.json');
             if (fs.existsSync(editorsPath)) {
-                const editors = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
+                const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
+                const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
                 const currentEditor = editors.find(editor => editor.url === editorUrl);
                 if (currentEditor) {
                     currentEditor.result = 'error';
                     currentEditor.errorType = errorType; // Track error type for debugging
-                    fs.writeFileSync(editorsPath, JSON.stringify(editors, null, 4));
+                    fs.writeFileSync(editorsPath, JSON.stringify(editorsData, null, 4));
                 }
             }
         } catch (updateError) {
@@ -1434,6 +1520,10 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         // Don't log here - error already shown above, just re-throw
         throw error;
     } finally {
+        // Remove this tab from switching rotation
+        const editorId = editorUrl ? editorUrl.split('/editor/')[1]?.split('?')[0] : 'unknown';
+        removeEditorTab(editorId);
+        
         // Keep editor status as "in-use" - do not reset to available
         console.log('📝 Editor remains "in-use" for future automations');
         
