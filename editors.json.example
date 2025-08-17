@@ -3,11 +3,6 @@
         "enabled": true,
         "intervalSeconds": 10
     },
-    "cacheManagement": {
-        "enabled": true,
-        "cleanupThresholdMB": 200,
-        "cleanupIntervalMinutes": 10
-    },
     "editors": [
         {
             "url": "https://www.capcut.com/editor/YOUR-EDITOR-ID-1?enter_from=draft&__action_from=recent&workspaceId=YOUR-WORKSPACE-ID&spaceId=YOUR-SPACE-ID&draftIdc=1&__from_page=work_space",

@@ -156,6 +156,7 @@ Thumbs.db
 
 # Queue and processing files (keep structure but not content)
 new videos
+!new videos.example
 processed videos
 
 # Cookie files (sensitive)

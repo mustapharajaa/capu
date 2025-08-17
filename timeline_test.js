@@ -13,15 +13,12 @@ const googleSheets = new GoogleSheetsService();
 // User data directory for persistent browser sessions (like reference app)
 const USER_DATA_DIR = path.join(__dirname, 'puppeteer_data');
 
-// Global variables for tab switching
-let runningEditorTabs = new Map(); // Map of editorId -> page
-let tabSwitchingInterval = null;
-
 // Global browser instance for reuse
 let globalBrowser = null;
 
-// Note: CapCut cookies and cache are preserved in puppeteer_data directory
-// Smart cache rotation keeps newest cookies automatically
+// Global tab switching state
+let tabSwitchingInterval = null;
+let runningEditorTabs = new Map(); // Map of editorId -> page
 
 // Tab switching management functions
 function startTabSwitching() {
@@ -186,7 +183,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 
             try {
                 globalBrowser = await puppeteer.launch(launchOptions);
-                console.log('🚀 Launched new browser instance (CapCut cache & cookies preserved)');
+                console.log('🚀 Launched new browser instance');
             } catch (error) {
                 console.error('❌ Failed to launch new browser:', error.message);
                 if (editorId && editors[editorId]) {

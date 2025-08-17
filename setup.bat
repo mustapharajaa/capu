@@ -173,6 +173,42 @@ if not exist "new videos" (
     echo   - 'new videos' file already exists
 )
 
+REM Validate and create youtube-cookies.txt file
+if not exist "youtube-cookies.txt" (
+    if exist "youtube-cookies.txt.example" (
+        copy "youtube-cookies.txt.example" "youtube-cookies.txt" >nul 2>&1
+        echo   - youtube-cookies.txt created from example
+    ) else (
+        echo   - WARNING: youtube-cookies.txt.example not found, cannot create youtube-cookies.txt
+    )
+) else (
+    echo   - youtube-cookies.txt already exists
+)
+
+REM Validate and create capcut-sheet-service-account.json file
+if not exist "capcut-sheet-service-account.json" (
+    if exist "capcut-sheet-service-account.json.example" (
+        copy "capcut-sheet-service-account.json.example" "capcut-sheet-service-account.json" >nul 2>&1
+        echo   - capcut-sheet-service-account.json created from example
+    ) else (
+        echo   - WARNING: capcut-sheet-service-account.json.example not found, cannot create capcut-sheet-service-account.json
+    )
+) else (
+    echo   - capcut-sheet-service-account.json already exists
+)
+
+REM Validate and create cookies.json file
+if not exist "cookies.json" (
+    if exist "cookies.json.example" (
+        copy "cookies.json.example" "cookies.json" >nul 2>&1
+        echo   - cookies.json created from example
+    ) else (
+        echo   - WARNING: cookies.json.example not found, cannot create cookies.json
+    )
+) else (
+    echo   - cookies.json already exists
+)
+
 echo.
 echo ========================================
 echo   SETUP COMPLETE!
