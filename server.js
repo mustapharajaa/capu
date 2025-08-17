@@ -579,31 +579,72 @@ const server = app.listen(port, '0.0.0.0', async () => {
         }
     } catch(e) {}
     
-    // Set up periodic cleanup for puppeteer_data to prevent 1GB+ growth
-    setInterval(async () => {
+    // Set up configurable periodic cleanup for puppeteer_data
+    function setupCacheCleanup() {
         try {
-            const puppeteerDataPath = path.join(__dirname, 'puppeteer_data');
-            if (fs.existsSync(puppeteerDataPath)) {
-                const stats = fs.statSync(puppeteerDataPath);
-                const sizeInMB = getDirectorySize(puppeteerDataPath) / (1024 * 1024);
-                
-                // Smart cache rotation if directory is larger than 200MB
-                if (sizeInMB > 200) {
-                    console.log(`🔄 Puppeteer data directory is ${sizeInMB.toFixed(0)}MB, rotating old cache...`);
+            const editorsData = JSON.parse(fs.readFileSync('editors.json', 'utf8'));
+            const cacheConfig = editorsData.cacheManagement || {
+                enabled: true,
+                cleanupThresholdMB: 200,
+                cleanupIntervalMinutes: 10
+            };
+            
+            if (cacheConfig.enabled) {
+                setInterval(async () => {
                     try {
-                        await rotateOldCache(puppeteerDataPath);
-                        console.log('🔄 Smart cache rotation completed (kept CapCut data, newest cookies)');
-                    } catch (cleanupError) {
-                        console.log('⚠️ Could not rotate cache:', cleanupError.message);
+                        // Check if any editors are currently running
+                        const editorsData = JSON.parse(fs.readFileSync('editors.json', 'utf8'));
+                        const runningEditors = editorsData.editors.filter(editor => editor.result === 'running');
+                        
+                        if (runningEditors.length > 0) {
+                            console.log(`⏸️ Cache cleanup skipped - ${runningEditors.length} editor(s) currently running`);
+                            return;
+                        }
+                        
+                        const puppeteerDataPath = path.join(__dirname, 'puppeteer_data');
+                        if (fs.existsSync(puppeteerDataPath)) {
+                            const sizeInMB = getDirectorySize(puppeteerDataPath) / (1024 * 1024);
+                            
+                            // Smart cache rotation if directory is larger than configured threshold
+                            if (sizeInMB > cacheConfig.cleanupThresholdMB) {
+                                console.log(`🔄 Puppeteer data directory is ${sizeInMB.toFixed(0)}MB, rotating old cache...`);
+                                console.log('✅ No editors running - safe to clean cache');
+                                try {
+                                    await rotateOldCache(puppeteerDataPath);
+                                    console.log('🔄 Smart cache rotation completed (kept CapCut data, newest cookies)');
+                                } catch (cleanupError) {
+                                    console.log('⚠️ Could not rotate cache:', cleanupError.message);
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        // Silent fail for periodic cleanup
                     }
-                }
+                }, cacheConfig.cleanupIntervalMinutes * 60 * 1000);
+                
+                console.log(`⏰ Periodic puppeteer_data cleanup scheduled every ${cacheConfig.cleanupIntervalMinutes} minutes (cleans if >${cacheConfig.cleanupThresholdMB}MB)`);
+            } else {
+                console.log('🔄 Cache cleanup disabled in editors.json');
             }
         } catch (error) {
-            // Silent fail for periodic cleanup
+            // Fallback to default settings if editors.json can't be read
+            console.log('⚠️ Could not read cache config from editors.json, using defaults');
+            setInterval(async () => {
+                try {
+                    const puppeteerDataPath = path.join(__dirname, 'puppeteer_data');
+                    if (fs.existsSync(puppeteerDataPath)) {
+                        const sizeInMB = getDirectorySize(puppeteerDataPath) / (1024 * 1024);
+                        if (sizeInMB > 200) {
+                            await rotateOldCache(puppeteerDataPath);
+                        }
+                    }
+                } catch (error) {}
+            }, 10 * 60 * 1000);
+            console.log('⏰ Periodic puppeteer_data cleanup scheduled every 10 minutes (cleans if >200MB) - DEFAULT');
         }
-    }, 10 * 60 * 1000); // Check every 10 minutes
+    }
     
-    console.log('⏰ Periodic puppeteer_data cleanup scheduled every 10 minutes (cleans if >200MB)');
+    setupCacheCleanup();
 });
 
 // Helper function to calculate directory size

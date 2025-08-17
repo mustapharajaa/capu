@@ -16,24 +16,37 @@ node setup.js
 1, add your .env.exemple details to .env paths it auto update
 2, edite google sheet key file  capcut-sheet-service-account.json
 3, edit cookies.json.exemple for login capcut error
+
     ^in localhost:3000/go or rdpip/go^
 4, editors.json & new videos & youtube-cookies.txt 
-npm run start
+
+5, npm run start
 ```
 
-⚠️ cookies ⚠️
+⚠️ youtube cookies ⚠️
 1, Open a new private browsing/incognito window and log into YouTube
 2, navigate to https://www.youtube.com/robots.txt (this should be the only private/incognito browsing tab open)
 3, Export youtube.com cookies from the browser, then close the private browsing/incognito window so that the session is never opened in the browser again.
 
 
-run rdp app in public commond
+⚠️run rdp app in public commond⚠️
 
 netsh advfirewall firewall add rule name="CapCut Automation Port 3000" dir=in action=allow protocol=TCP localport=3000
 
 
 
-Open: http://localhost:3000
+You'll need to create a new firewall group for this server:
+
+1, Go to Vultr Dashboard → Firewall Groups
+2, Create New Firewall Group
+3, Add IPv4 Rules:
+accept TCP 3000 0.0.0.0/0 (Web App)
+
+
+
+
+Open: http://localhost:3000/go
+
 
 ## 📋 Features
 
