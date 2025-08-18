@@ -26,6 +26,19 @@
     </div>
 
     <div class="container" style="margin-top: 30px;">
+        <h1>Update CapCut Cookies</h1>
+        <p>Paste your CapCut authentication cookies in JSON format below and click save.</p>
+        <textarea id="capcut-cookies-textarea" placeholder='[{"name": "cookie_name", "value": "cookie_value", "domain": ".capcut.com", ...}]'></textarea>
+        <button id="save-capcut-cookies-button">Save CapCut Cookies</button>
+        <button id="refresh-capcut-cookies-button">Refresh</button>
+        <label style="margin-left: 15px;">
+            <input type="checkbox" id="auto-refresh-capcut-cookies-checkbox">
+            Auto-Refresh (5s)
+        </label>
+        <div id="capcut-cookies-status-message" class="status"></div>
+    </div>
+
+    <div class="container" style="margin-top: 30px;">
         <h1>Manage Editors Status</h1>
         <p>View and edit <code>editors.json</code> to monitor and manage automation status.</p>
         <textarea id="editors-textarea"></textarea>
@@ -49,6 +62,19 @@
             Auto-Refresh (5s)
         </label>
         <div id="new-videos-status-message" class="status"></div>
+    </div>
+
+    <div class="container" style="margin-top: 30px;">
+        <h1>Google Sheets Service Account</h1>
+        <p>View and edit the <code>capcut-sheet-service-account.json</code> file for Google Sheets integration.</p>
+        <textarea id="service-account-textarea" placeholder='{"type": "service_account", "project_id": "your-project", ...}'></textarea>
+        <button id="save-service-account-button">Save Service Account</button>
+        <button id="refresh-service-account-button">Refresh</button>
+        <label style="margin-left: 15px;">
+            <input type="checkbox" id="auto-refresh-service-account-checkbox">
+            Auto-Refresh (5s)
+        </label>
+        <div id="service-account-status-message" class="status"></div>
     </div>
 
     <script>
@@ -122,12 +148,24 @@
 
             // --- Section Initializations ---
 
-            // Cookies Section
+            // YouTube Cookies Section
             const cookiesTextarea = document.getElementById('cookies-textarea');
             const saveCookiesButton = document.getElementById('save-button');
             const cookiesStatus = document.getElementById('cookies-status-message');
             saveCookiesButton.addEventListener('click', () => saveContent('/api/cookies', cookiesTextarea, cookiesStatus, 'cookies'));
             loadContent('/api/cookies', cookiesTextarea, cookiesStatus);
+
+            // CapCut Cookies Section
+            const capcutCookiesTextarea = document.getElementById('capcut-cookies-textarea');
+            const saveCapcutCookiesButton = document.getElementById('save-capcut-cookies-button');
+            const refreshCapcutCookiesButton = document.getElementById('refresh-capcut-cookies-button');
+            const autoRefreshCapcutCookiesCheckbox = document.getElementById('auto-refresh-capcut-cookies-checkbox');
+            const capcutCookiesStatus = document.getElementById('capcut-cookies-status-message');
+            const loadCapcutCookies = () => loadContent('/api/capcut-cookies', capcutCookiesTextarea, capcutCookiesStatus, true);
+            saveCapcutCookiesButton.addEventListener('click', () => saveContent('/api/capcut-cookies', capcutCookiesTextarea, capcutCookiesStatus, 'cookies', true));
+            refreshCapcutCookiesButton.addEventListener('click', loadCapcutCookies);
+            setupAutoRefresh(autoRefreshCapcutCookiesCheckbox, loadCapcutCookies, capcutCookiesStatus);
+            loadCapcutCookies();
 
             // Editors Section
             const editorsTextarea = document.getElementById('editors-textarea');
@@ -152,6 +190,18 @@
             refreshNewVideosButton.addEventListener('click', loadNewVideos);
             setupAutoRefresh(autoRefreshNewVideosCheckbox, loadNewVideos, newVideosStatus);
             loadNewVideos();
+
+            // Service Account Section
+            const serviceAccountTextarea = document.getElementById('service-account-textarea');
+            const saveServiceAccountButton = document.getElementById('save-service-account-button');
+            const refreshServiceAccountButton = document.getElementById('refresh-service-account-button');
+            const autoRefreshServiceAccountCheckbox = document.getElementById('auto-refresh-service-account-checkbox');
+            const serviceAccountStatus = document.getElementById('service-account-status-message');
+            const loadServiceAccount = () => loadContent('/api/service-account', serviceAccountTextarea, serviceAccountStatus, true);
+            saveServiceAccountButton.addEventListener('click', () => saveContent('/api/service-account', serviceAccountTextarea, serviceAccountStatus, 'serviceAccount', true));
+            refreshServiceAccountButton.addEventListener('click', loadServiceAccount);
+            setupAutoRefresh(autoRefreshServiceAccountCheckbox, loadServiceAccount, serviceAccountStatus);
+            loadServiceAccount();
         });
     </script>
 </body>

@@ -302,6 +302,91 @@ app.post('/api/new-videos', (req, res) => {
     });
 });
 
+// CapCut cookies routes
+app.get('/api/capcut-cookies', (req, res) => {
+    const capcutCookiesPath = path.join(__dirname, 'cookies.json');
+    if (fs.existsSync(capcutCookiesPath)) {
+        res.type('application/json');
+        res.sendFile(capcutCookiesPath);
+    } else {
+        res.status(200).json([]); // Send empty array if it doesn't exist
+    }
+});
+
+app.post('/api/capcut-cookies', (req, res) => {
+    const { cookies } = req.body;
+    
+    // Handle both string and object data from frontend
+    let cookiesData;
+    let cookiesString;
+    
+    if (typeof cookies === 'string') {
+        // If it's already a string, parse it to validate
+        try {
+            cookiesData = JSON.parse(cookies);
+            cookiesString = cookies;
+        } catch (error) {
+            return res.status(400).json({ success: false, message: 'Invalid JSON format for CapCut cookies.' });
+        }
+    } else if (typeof cookies === 'object' && cookies !== null) {
+        // If it's an object (from frontend JSON parsing), stringify it
+        cookiesData = cookies;
+        cookiesString = JSON.stringify(cookies, null, 2);
+    } else {
+        return res.status(400).json({ success: false, message: 'Invalid CapCut cookies data.' });
+    }
+
+    // Validate that it's an array
+    if (!Array.isArray(cookiesData)) {
+        return res.status(400).json({ success: false, message: 'CapCut cookies must be a JSON array.' });
+    }
+
+    const capcutCookiesPath = path.join(__dirname, 'cookies.json');
+    fs.writeFile(capcutCookiesPath, cookiesString, (err) => {
+        if (err) {
+            console.error('Error saving CapCut cookies file:', err);
+            return res.status(500).json({ success: false, message: 'Failed to save CapCut cookies file.' });
+        }
+        console.log('🍪 CapCut cookies file updated successfully via API.');
+        res.json({ success: true, message: 'CapCut cookies saved successfully!' });
+    });
+});
+
+// Google Sheets service account routes
+app.get('/api/service-account', (req, res) => {
+    const serviceAccountPath = path.join(__dirname, 'capcut-sheet-service-account.json');
+    if (fs.existsSync(serviceAccountPath)) {
+        res.type('application/json');
+        res.sendFile(serviceAccountPath);
+    } else {
+        res.status(200).json({}); // Send empty JSON if it doesn't exist
+    }
+});
+
+app.post('/api/service-account', (req, res) => {
+    const { serviceAccount } = req.body;
+    if (typeof serviceAccount !== 'string') {
+        return res.status(400).json({ success: false, message: 'Invalid service account data.' });
+    }
+
+    // Validate JSON format
+    try {
+        JSON.parse(serviceAccount);
+    } catch (error) {
+        return res.status(400).json({ success: false, message: 'Invalid JSON format for service account.' });
+    }
+
+    const serviceAccountPath = path.join(__dirname, 'capcut-sheet-service-account.json');
+    fs.writeFile(serviceAccountPath, serviceAccount, (err) => {
+        if (err) {
+            console.error('Error saving service account file:', err);
+            return res.status(500).json({ success: false, message: 'Failed to save service account file.' });
+        }
+        console.log('🔑 Google Sheets service account file updated successfully via API.');
+        res.json({ success: true, message: 'Service account credentials saved successfully!' });
+    });
+});
+
 // YouTube download routes
 app.post('/youtube/info', async (req, res) => {
     try {

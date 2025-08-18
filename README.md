@@ -13,14 +13,14 @@ npm cache clean --force
 npm install
 node setup.js 
 
-1, add your .env.exemple details to .env paths it auto update
-2, edite google sheet key file  capcut-sheet-service-account.json
-3, edit cookies.json.exemple for login capcut error
+1, edit .env details                                       
+
+FFMPEG_PATH=# FFMPEG_PATH will use npm package fallback - comment out or remove the line above
 
     ^in localhost:3000/go or rdpip/go^
-4, editors.json & new videos & youtube-cookies.txt 
+2, editors.json & new videos & youtube-cookies.txt & google sheet  key & capcut cookies.json
 
-5, npm run start
+3, npm run start
 ```
 
 ⚠️ youtube cookies ⚠️
