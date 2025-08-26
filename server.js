@@ -424,8 +424,15 @@ app.post('/youtube/download', async (req, res) => {
         if (!fs.existsSync(editorsPath)) {
             throw new Error('editors.json not found - cannot check editor availability');
         }
-        const editors = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
-        const availableEditor = editors.find(editor => editor.status === 'available');
+        const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
+        // Handle both old array structure and new object structure
+        const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
+        
+        // Use same logic as batch processor: check both status AND result
+        const availableEditor = editors.find(editor => 
+            editor.status === 'available' && editor.result !== 'running'
+        );
+        
         if (!availableEditor) {
             console.log('❌ All editors are busy - download blocked');
             broadcastProgress('❌ All editors are busy - download blocked');

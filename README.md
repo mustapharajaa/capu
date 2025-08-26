@@ -17,6 +17,8 @@ node setup.js
 
 FFMPEG_PATH=# FFMPEG_PATH will use npm package fallback - comment out or remove the line above
 
+
+
     ^in localhost:3000/go or rdpip/go^
 2, editors.json & new videos & youtube-cookies.txt & google sheet  key & capcut cookies.json
 

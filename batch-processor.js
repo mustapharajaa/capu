@@ -150,9 +150,11 @@ class BatchProcessor {
 
             const editorsData = JSON.parse(fs.readFileSync(this.editorsFile, 'utf8'));
             const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
-            const availableEditors = editors.filter(editor => editor.status === 'available');
+            const availableEditors = editors.filter(editor => 
+                editor.status === 'available' && editor.result !== 'running'
+            );
             
-            console.log(`📊 Editor availability: ${availableEditors.length}/${editors.length} available`);
+            console.log(`📊 Editor availability: ${availableEditors.length}/${editors.length} available (status='available' AND result!='running')`);
             return availableEditors.length > 0;
         } catch (error) {
             console.error('❌ Error checking editor availability:', error.message);
@@ -189,6 +191,12 @@ class BatchProcessor {
         this.currentVideo = url;
 
         try {
+            // Check editor availability before downloading
+            if (!this.checkEditorAvailability()) {
+                console.log('❌ All editors are busy - skipping download');
+                return { success: false, message: 'All editors are currently in-use' };
+            }
+
             // Step 1: Download the video
             console.log('📥 Step 1: Downloading YouTube video...');
             const downloadedPath = await downloadYouTubeVideo(url, (progress) => {

@@ -122,6 +122,77 @@ if %errorlevel% neq 0 (
 )
 
 echo.
+echo Creating configuration files...
+
+REM Create configuration files BEFORE running setup.js
+if not exist ".env" (
+    if exist ".env.example" (
+        copy ".env.example" ".env" >nul 2>&1
+        echo   - .env created from .env.example
+    ) else (
+        echo   - WARNING: .env.example not found, cannot create .env
+    )
+) else (
+    echo   - .env already exists
+)
+
+REM Create all other configuration files
+if not exist "editors.json" (
+    if exist "editors.json.example" (
+        copy "editors.json.example" "editors.json" >nul 2>&1
+        echo   - editors.json created from editors.json.example
+    ) else (
+        echo   - WARNING: editors.json.example not found, cannot create editors.json
+    )
+) else (
+    echo   - editors.json already exists
+)
+
+if not exist "new videos" (
+    if exist "new videos.example" (
+        copy "new videos.example" "new videos" >nul 2>&1
+        echo   - 'new videos' file created from example
+    ) else (
+        echo   - WARNING: 'new videos.example' not found, cannot create 'new videos'
+    )
+) else (
+    echo   - 'new videos' file already exists
+)
+
+if not exist "youtube-cookies.txt" (
+    if exist "youtube-cookies.txt.example" (
+        copy "youtube-cookies.txt.example" "youtube-cookies.txt" >nul 2>&1
+        echo   - youtube-cookies.txt created from example
+    ) else (
+        echo   - WARNING: youtube-cookies.txt.example not found, cannot create youtube-cookies.txt
+    )
+) else (
+    echo   - youtube-cookies.txt already exists
+)
+
+if not exist "capcut-sheet-service-account.json" (
+    if exist "capcut-sheet-service-account.json.example" (
+        copy "capcut-sheet-service-account.json.example" "capcut-sheet-service-account.json" >nul 2>&1
+        echo   - capcut-sheet-service-account.json created from example
+    ) else (
+        echo   - WARNING: capcut-sheet-service-account.json.example not found, cannot create capcut-sheet-service-account.json
+    )
+) else (
+    echo   - capcut-sheet-service-account.json already exists
+)
+
+if not exist "cookies.json" (
+    if exist "cookies.json.example" (
+        copy "cookies.json.example" "cookies.json" >nul 2>&1
+        echo   - cookies.json created from example
+    ) else (
+        echo   - WARNING: cookies.json.example not found, cannot create cookies.json
+    )
+) else (
+    echo   - cookies.json already exists
+)
+
+echo.
 echo Running automated setup...
 node setup.js
 if %errorlevel% neq 0 (
@@ -135,79 +206,9 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo Creating configuration files...
-
-REM Validate and create .env file
-if not exist ".env" (
-    if exist ".env.example" (
-        copy ".env.example" ".env" >nul 2>&1
-        echo   - .env created from .env.example
-    ) else (
-        echo   - WARNING: .env.example not found, cannot create .env
-    )
-) else (
-    echo   - .env already exists
-)
-
-REM Validate and create editors.json file
-if not exist "editors.json" (
-    if exist "editors.json.example" (
-        copy "editors.json.example" "editors.json" >nul 2>&1
-        echo   - editors.json created from editors.json.example
-    ) else (
-        echo   - WARNING: editors.json.example not found, cannot create editors.json
-    )
-) else (
-    echo   - editors.json already exists
-)
-
-REM Validate and create new videos file
-if not exist "new videos" (
-    if exist "new videos.example" (
-        copy "new videos.example" "new videos" >nul 2>&1
-        echo   - 'new videos' file created from example
-    ) else (
-        echo   - WARNING: 'new videos.example' not found, cannot create 'new videos'
-    )
-) else (
-    echo   - 'new videos' file already exists
-)
-
-REM Validate and create youtube-cookies.txt file
-if not exist "youtube-cookies.txt" (
-    if exist "youtube-cookies.txt.example" (
-        copy "youtube-cookies.txt.example" "youtube-cookies.txt" >nul 2>&1
-        echo   - youtube-cookies.txt created from example
-    ) else (
-        echo   - WARNING: youtube-cookies.txt.example not found, cannot create youtube-cookies.txt
-    )
-) else (
-    echo   - youtube-cookies.txt already exists
-)
-
-REM Validate and create capcut-sheet-service-account.json file
-if not exist "capcut-sheet-service-account.json" (
-    if exist "capcut-sheet-service-account.json.example" (
-        copy "capcut-sheet-service-account.json.example" "capcut-sheet-service-account.json" >nul 2>&1
-        echo   - capcut-sheet-service-account.json created from example
-    ) else (
-        echo   - WARNING: capcut-sheet-service-account.json.example not found, cannot create capcut-sheet-service-account.json
-    )
-) else (
-    echo   - capcut-sheet-service-account.json already exists
-)
-
-REM Validate and create cookies.json file
-if not exist "cookies.json" (
-    if exist "cookies.json.example" (
-        copy "cookies.json.example" "cookies.json" >nul 2>&1
-        echo   - cookies.json created from example
-    ) else (
-        echo   - WARNING: cookies.json.example not found, cannot create cookies.json
-    )
-) else (
-    echo   - cookies.json already exists
-)
+echo Removing quotes from .env file paths...
+powershell -Command "(Get-Content .env) -replace '\"([^\"]*?)\"', '$1' | Set-Content .env"
+echo   - .env paths cleaned (quotes removed)
 
 echo.
 echo ========================================
