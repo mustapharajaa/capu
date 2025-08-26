@@ -6,6 +6,78 @@ echo   TRUE ONE-CLICK INSTALLER
 echo ========================================
 echo.
 
+echo Creating configuration files first...
+
+REM Create configuration files BEFORE anything else
+if not exist ".env" (
+    if exist ".env.example" (
+        copy ".env.example" ".env" >nul 2>&1
+        echo   - .env created from .env.example
+    ) else (
+        echo   - WARNING: .env.example not found, cannot create .env
+    )
+) else (
+    echo   - .env already exists
+)
+
+if not exist "editors.json" (
+    if exist "editors.json.example" (
+        copy "editors.json.example" "editors.json" >nul 2>&1
+        echo   - editors.json created from editors.json.example
+    ) else (
+        echo   - WARNING: editors.json.example not found, cannot create editors.json
+    )
+) else (
+    echo   - editors.json already exists
+)
+
+if not exist "new videos" (
+    if exist "new videos.example" (
+        copy "new videos.example" "new videos" >nul 2>&1
+        echo   - 'new videos' file created from example
+    ) else (
+        echo   - WARNING: 'new videos.example' not found, cannot create 'new videos'
+    )
+) else (
+    echo   - 'new videos' file already exists
+)
+
+if not exist "youtube-cookies.txt" (
+    if exist "youtube-cookies.txt.example" (
+        copy "youtube-cookies.txt.example" "youtube-cookies.txt" >nul 2>&1
+        echo   - youtube-cookies.txt created from example
+    ) else (
+        echo   - WARNING: youtube-cookies.txt.example not found, cannot create youtube-cookies.txt
+    )
+) else (
+    echo   - youtube-cookies.txt already exists
+)
+
+if not exist "capcut-sheet-service-account.json" (
+    if exist "capcut-sheet-service-account.json.example" (
+        copy "capcut-sheet-service-account.json.example" "capcut-sheet-service-account.json" >nul 2>&1
+        echo   - capcut-sheet-service-account.json created from example
+    ) else (
+        echo   - WARNING: capcut-sheet-service-account.json.example not found, cannot create capcut-sheet-service-account.json
+    )
+) else (
+    echo   - capcut-sheet-service-account.json already exists
+)
+
+if not exist "cookies.json" (
+    if exist "cookies.json.example" (
+        copy "cookies.json.example" "cookies.json" >nul 2>&1
+        echo   - cookies.json created from example
+    ) else (
+        echo   - WARNING: cookies.json.example not found, cannot create cookies.json
+    )
+) else (
+    echo   - cookies.json already exists
+)
+
+echo.
+echo Configuration files created! Now checking Node.js...
+
 REM Check if Node.js is installed (check multiple locations)
 set "NODE_FOUND=0"
 
@@ -97,100 +169,39 @@ echo.
 echo Installing Node.js dependencies...
 echo DEBUG: About to run npm install...
 call npm install
-echo DEBUG: npm install completed with exit code: %errorlevel%
-if %errorlevel% neq 0 (
-    echo ERROR: npm install failed. Trying with full path...
+set NPM_EXIT_CODE=%errorlevel%
+echo DEBUG: npm install completed with exit code: %NPM_EXIT_CODE%
+if %NPM_EXIT_CODE% neq 0 (
+    echo ERROR: npm install failed with code %NPM_EXIT_CODE%. Trying with full path...
     if exist "%ProgramFiles%\nodejs\npm.cmd" (
         call "%ProgramFiles%\nodejs\npm.cmd" install
+        set NPM_EXIT_CODE=%errorlevel%
+        echo DEBUG: Full path npm install completed with exit code: %NPM_EXIT_CODE%
     ) else (
         echo Please run manually: npm install
-        pause
+        echo Continuing with setup anyway...
     )
 )
+echo DEBUG: Continuing to FFmpeg installation...
 
 echo.
 echo Installing FFmpeg npm package (fallback for setup)...
 call npm install @ffmpeg-installer/ffmpeg
-if %errorlevel% neq 0 (
-    echo ERROR: FFmpeg install failed. Trying with full path...
+set FFMPEG_EXIT_CODE=%errorlevel%
+echo DEBUG: FFmpeg install completed with exit code: %FFMPEG_EXIT_CODE%
+if %FFMPEG_EXIT_CODE% neq 0 (
+    echo ERROR: FFmpeg install failed with code %FFMPEG_EXIT_CODE%. Trying with full path...
     if exist "%ProgramFiles%\nodejs\npm.cmd" (
         call "%ProgramFiles%\nodejs\npm.cmd" install @ffmpeg-installer/ffmpeg
+        set FFMPEG_EXIT_CODE=%errorlevel%
+        echo DEBUG: Full path FFmpeg install completed with exit code: %FFMPEG_EXIT_CODE%
     ) else (
         echo Please run manually: npm install @ffmpeg-installer/ffmpeg
-        pause
+        echo Continuing with setup anyway...
     )
 )
+echo DEBUG: Moving to configuration files creation...
 
-echo.
-echo Creating configuration files...
-
-REM Create configuration files BEFORE running setup.js
-if not exist ".env" (
-    if exist ".env.example" (
-        copy ".env.example" ".env" >nul 2>&1
-        echo   - .env created from .env.example
-    ) else (
-        echo   - WARNING: .env.example not found, cannot create .env
-    )
-) else (
-    echo   - .env already exists
-)
-
-REM Create all other configuration files
-if not exist "editors.json" (
-    if exist "editors.json.example" (
-        copy "editors.json.example" "editors.json" >nul 2>&1
-        echo   - editors.json created from editors.json.example
-    ) else (
-        echo   - WARNING: editors.json.example not found, cannot create editors.json
-    )
-) else (
-    echo   - editors.json already exists
-)
-
-if not exist "new videos" (
-    if exist "new videos.example" (
-        copy "new videos.example" "new videos" >nul 2>&1
-        echo   - 'new videos' file created from example
-    ) else (
-        echo   - WARNING: 'new videos.example' not found, cannot create 'new videos'
-    )
-) else (
-    echo   - 'new videos' file already exists
-)
-
-if not exist "youtube-cookies.txt" (
-    if exist "youtube-cookies.txt.example" (
-        copy "youtube-cookies.txt.example" "youtube-cookies.txt" >nul 2>&1
-        echo   - youtube-cookies.txt created from example
-    ) else (
-        echo   - WARNING: youtube-cookies.txt.example not found, cannot create youtube-cookies.txt
-    )
-) else (
-    echo   - youtube-cookies.txt already exists
-)
-
-if not exist "capcut-sheet-service-account.json" (
-    if exist "capcut-sheet-service-account.json.example" (
-        copy "capcut-sheet-service-account.json.example" "capcut-sheet-service-account.json" >nul 2>&1
-        echo   - capcut-sheet-service-account.json created from example
-    ) else (
-        echo   - WARNING: capcut-sheet-service-account.json.example not found, cannot create capcut-sheet-service-account.json
-    )
-) else (
-    echo   - capcut-sheet-service-account.json already exists
-)
-
-if not exist "cookies.json" (
-    if exist "cookies.json.example" (
-        copy "cookies.json.example" "cookies.json" >nul 2>&1
-        echo   - cookies.json created from example
-    ) else (
-        echo   - WARNING: cookies.json.example not found, cannot create cookies.json
-    )
-) else (
-    echo   - cookies.json already exists
-)
 
 echo.
 echo Running automated setup...
