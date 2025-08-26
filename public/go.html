@@ -107,7 +107,9 @@
                 let data;
                 try {
                     if (isJson) {
-                        data = JSON.parse(textarea.value); // Validate JSON
+                        // Validate JSON but send as string for server compatibility
+                        JSON.parse(textarea.value); // Just validate
+                        data = textarea.value; // Send as string
                     } else {
                         data = textarea.value;
                     }
