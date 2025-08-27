@@ -72,19 +72,36 @@ async function downloadYouTubeVideo(url, progressCallback) {
             }
             const sanitizedTitle = sanitizeFilename(metadata.title);
 
-            // No timestamp - clean filename as requested
-            const outputFilename = `${sanitizedTitle}.mp4`;
+            // Check for duplicate filenames and add numbering if needed
+            let outputFilename = `${sanitizedTitle}.mp4`;
+            let baseFilename = sanitizedTitle;
+            let counter = 1;
+            
+            // Keep checking until we find a unique filename
+            while (fs.existsSync(path.join(UPLOADS_DIR, outputFilename))) {
+                outputFilename = `${baseFilename} (${counter}).mp4`;
+                counter++;
+            }
             
             const outputPath = path.join(UPLOADS_DIR, outputFilename);
-            const infoJsonPath = path.join(UPLOADS_DIR, `${sanitizedTitle}.info.json`);
+            const infoJsonName = outputFilename.replace('.mp4', '.info.json');
+            const infoJsonPath = path.join(UPLOADS_DIR, infoJsonName);
 
             // Save the metadata we already fetched to the .info.json file
             fs.writeFileSync(infoJsonPath, JSON.stringify(metadata, null, 2));
             console.log(`Saved .info.json to ${infoJsonPath}`);
+            
+            // Extract resolution info from metadata for display
+            const height = metadata.height || 'Unknown';
+            const width = metadata.width || 'Unknown';
+            // For vertical videos (height > width), use width for resolution label
+            const resolutionValue = width > height ? height : width;
+            const resolution = resolutionValue !== 'Unknown' ? `${resolutionValue}p` : 'Unknown';
+            console.log(`📺 Video Resolution: ${width}x${height} (${resolution})`);
 
-            // Use EXACT same format as reference app
+            // Download best available quality (no resolution limit)
             const ytdlpArgs = [
-                '--format', 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
+                '--format', 'bestvideo+bestaudio/best',
                 '--output', outputPath,
                 '--no-playlist',
                 '--write-info-json',
@@ -104,25 +121,88 @@ async function downloadYouTubeVideo(url, progressCallback) {
 
             console.log(`🔧 FFmpeg Path: ${FFMPEG_PATH}`);
             console.log(`Executing: ${YTDLP_BINARY_PATH} ${ytdlpArgs.join(' ')}`);
+            
+            // Format checking removed for cleaner output
+            
             if (progressCallback) progressCallback({ message: 'Starting download...' });
+
+            // Suppress ytdlp console output
+            const originalWrite = process.stdout.write;
+            const originalLog = console.log;
+            let progressLine = '';
+            
+            // Override console methods to filter ytdlp output but allow format info
+            process.stdout.write = function(chunk, ...args) {
+                const str = chunk.toString();
+                // Allow our progress line, format info, and important messages
+                if (str.startsWith('\r📥 Downloading:') || 
+                    !str.includes('Download Progress:') ||
+                    str.includes('[info]') ||
+                    str.includes('[Merger]') ||
+                    str.includes('format')) {
+                    return originalWrite.call(this, chunk, ...args);
+                }
+                return true;
+            };
+            
+            console.log = function(...args) {
+                const str = args.join(' ');
+                // Allow format info, merger info, and important logs
+                if (!str.includes('Download Progress:') || 
+                    str.includes('[info]') ||
+                    str.includes('[Merger]') ||
+                    str.includes('format') ||
+                    str.includes('Downloading 1 format') ||
+                    str.includes('Merging formats')) {
+                    return originalLog.apply(this, args);
+                }
+            };
 
             ytDlpWrap.exec(ytdlpArgs)
                 .on('progress', (progress) => {
                     const percent = progress.percent ? progress.percent.toFixed(1) : 0;
-                    const message = `Downloading... ${percent}% at ${progress.currentSpeed || 'N/A'}`;
-                    if (progressCallback) progressCallback({ message: message, progress: percent });
+                    const speed = progress.currentSpeed || 'N/A';
+                    const message = `📥 Downloading: ${percent}% | ${speed}`;
+                    
+                    // Single line progress like npm
+                    process.stdout.write(`\r${message.padEnd(50)}`);
+                    
+                    if (progressCallback) progressCallback({ message: `Downloading... ${percent}% at ${speed}`, progress: percent });
                 })
                 .on('ytDlpEvent', (eventType, eventData) => {
-                    console.log(`[${eventType}] ${eventData}`);
+                    // Show format selection with resolution info
+                    if (eventType === 'info' && eventData.includes('Downloading 1 format')) {
+                        // Extract format numbers and show with resolution
+                        const formatMatch = eventData.match(/Downloading 1 format\(s\): (.+)/);
+                        if (formatMatch) {
+                            const formats = formatMatch[1];
+                            console.log(`📋 Selected formats: ${formats} (${resolution})`);
+                        } else {
+                            console.log(`📋 ${eventData}`);
+                        }
+                    }
+                    
+                    if (eventType === 'Merger' || eventData.includes('Merging formats')) {
+                        console.log(`🔧 FFmpeg: ${eventData}`);
+                    }
+                    
                     if (progressCallback) progressCallback({ message: `[${eventType}] ${eventData}` });
                 })
                 .on('error', (error) => {
+                    // Restore original console methods on error
+                    process.stdout.write = originalWrite;
+                    console.log = originalLog;
+                    
                     console.error('Error during download:', error);
                     if (progressCallback) progressCallback({ message: `Error: ${error.message}` });
                     reject(error);
                 })
                 .on('close', () => {
-                    console.log(`Download finished: ${outputPath}`);
+                    // Restore original console methods
+                    process.stdout.write = originalWrite;
+                    console.log = originalLog;
+                    
+                    console.log(`\n✅ Download finished: ${outputPath}`);
                     updateVideosJson(sanitizedTitle, metadata.description, 'downloaded', timestamp, outputFilename);
                     if (progressCallback) progressCallback({ message: `DOWNLOADED: ${outputPath}`, progress: 100, isComplete: true, finalPath: outputPath });
                     resolve(outputPath);
