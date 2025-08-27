@@ -246,7 +246,18 @@ app.post('/api/cookies', (req, res) => {
 });
 
 app.post('/api/editors', (req, res) => {
-    const { editors } = req.body;
+    let editors = req.body.editors || req.body;
+    
+    // Handle case where editors data might be double-encoded as string
+    if (typeof editors === 'string') {
+        try {
+            editors = JSON.parse(editors);
+        } catch (parseError) {
+            console.error('Error parsing editors string:', parseError);
+            return res.status(400).json({ success: false, message: 'Invalid JSON format in editors data.' });
+        }
+    }
+    
     if (!editors) {
         return res.status(400).json({ success: false, message: 'Invalid editors data.' });
     }
