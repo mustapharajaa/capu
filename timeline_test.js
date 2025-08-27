@@ -610,7 +610,12 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                     'button.lv-btn.lv-btn-secondary:has-text("Continue uploading")',
                                     'xpath//button[contains(@class, "lv-btn") and .//span[text()="Continue uploading"]]',
                                     'xpath///html/body/div[12]/div[2]/div/div[2]/div[3]/div/button[1]',
-                                    'body > div:nth-child(73) > div.lv-modal-wrapper.lv-modal-wrapper-align-center > div > div:nth-child(2) > div.lv-modal-footer > div > button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button'
+                                    'xpath///html/body/div[12]/div[2]/div/div[2]/div[3]/div/button[1]/span',
+                                    'body > div:nth-child(73) > div.lv-modal-wrapper.lv-modal-wrapper-align-center > div > div:nth-child(2) > div.lv-modal-footer > div > button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button',
+                                    'body > div:nth-child(63) > div.lv-modal-wrapper.lv-modal-wrapper-align-center > div > div:nth-child(2) > div.lv-modal-footer > div > button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button',
+                                    'body > div:nth-child(63) > div.lv-modal-wrapper.lv-modal-wrapper-align-center > div > div:nth-child(2) > div.lv-modal-footer > div > button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button > span',
+                                    'button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button:has(span:contains("Continue uploading"))',
+                                    'span:contains("Continue uploading")'
                                 ];
                                 
                                 for (const popupSelector of continuePopupSelectors) {
