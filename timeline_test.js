@@ -603,46 +603,121 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         let badgeDisappeared = false;
                         
                         while (!badgeDisappeared && (Date.now() - startTime) < maxWaitTime) {
-                            // Check for "Continue uploading" popup and click it
+                            // Check for "Continue uploading" popup and click it with enhanced detection
                             try {
+                                console.log('🔍 Checking for "Continue uploading" popup...');
+                                
                                 const continuePopupSelectors = [
+                                    // Text-based selectors
                                     'button:has-text("Continue uploading")',
                                     'button.lv-btn.lv-btn-secondary:has-text("Continue uploading")',
+                                    'span:contains("Continue uploading")',
+                                    
+                                    // Direct span selector
+                                    'span:has-text("Continue uploading")',
+                                    
+                                    // XPath selectors for button with text
                                     'xpath//button[contains(@class, "lv-btn") and .//span[text()="Continue uploading"]]',
-                                    'xpath///html/body/div[12]/div[2]/div/div[2]/div[3]/div/button[1]',
+                                    'xpath//button[contains(@class, "lv-btn") and contains(text(), "Continue uploading")]',
+                                    'xpath//span[text()="Continue uploading"]/parent::button',
+                                    'xpath//span[contains(text(), "Continue uploading")]',
+                                    'xpath//span[text()="Continue uploading"]',
+                                    
+                                    // XPath for specific span path
                                     'xpath///html/body/div[12]/div[2]/div/div[2]/div[3]/div/button[1]/span',
-                                    'body > div:nth-child(73) > div.lv-modal-wrapper.lv-modal-wrapper-align-center > div > div:nth-child(2) > div.lv-modal-footer > div > button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button',
-                                    'body > div:nth-child(63) > div.lv-modal-wrapper.lv-modal-wrapper-align-center > div > div:nth-child(2) > div.lv-modal-footer > div > button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button',
+                                    
+                                    // Modal footer button selectors
+                                    'div.lv-modal-footer button.lv-btn-secondary',
+                                    '.lv-modal-wrapper button.lv-btn-secondary',
+                                    'button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button',
+                                    
+                                    // CSS selector for specific button span
                                     'body > div:nth-child(63) > div.lv-modal-wrapper.lv-modal-wrapper-align-center > div > div:nth-child(2) > div.lv-modal-footer > div > button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button > span',
-                                    'button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button:has(span:contains("Continue uploading"))',
-                                    'span:contains("Continue uploading")'
+                                    
+                                    // Specific path selectors
+                                    'xpath///html/body/div[12]/div[2]/div/div[2]/div[3]/div/button[1]',
+                                    'xpath///html/body/div[13]/div[2]/div/div[2]/div[3]/div/button[1]',
+                                    'xpath///html/body/div[14]/div[2]/div/div[2]/div[3]/div/button[1]',
+                                    'body > div:nth-child(73) > div.lv-modal-wrapper.lv-modal-wrapper-align-center > div > div:nth-child(2) > div.lv-modal-footer > div > button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button',
+                                    'body > div:nth-child(63) > div.lv-modal-wrapper.lv-modal-wrapper-align-center > div > div:nth-child(2) > div.lv-modal-footer > div > button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button'
                                 ];
+                                
+                                let foundButton = false;
                                 
                                 for (const popupSelector of continuePopupSelectors) {
                                     try {
+                                        console.log(`🔍 Testing selector: ${popupSelector.substring(0, 50)}...`);
                                         let continueButton = null;
+                                        
                                         if (popupSelector.startsWith('xpath//')) {
                                             const xpath = popupSelector.replace('xpath//', '');
-                                            continueButton = await page.$x(xpath);
-                                            continueButton = continueButton[0];
+                                            const elements = await page.$x(xpath);
+                                            continueButton = elements[0];
                                         } else {
                                             continueButton = await page.$(popupSelector);
                                         }
                                         
                                         if (continueButton) {
-                                            console.log('🔄 Found "Continue uploading" popup - clicking to continue...');
-                                            if (progressCallback) progressCallback('🔄 Clicking "Continue uploading" popup...');
-                                            await continueButton.click();
-                                            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds after click
-                                            console.log('✅ "Continue uploading" popup clicked successfully');
-                                            break;
+                                            // Verify button text contains "Continue uploading"
+                                            const buttonText = await continueButton.evaluate(el => el.textContent || el.innerText || '');
+                                            console.log(`🔍 Found button with text: "${buttonText}"`);
+                                            
+                                            if (buttonText.toLowerCase().includes('continue uploading') || buttonText.toLowerCase().includes('continue') || popupSelector.includes('modal-footer')) {
+                                                console.log('🔄 Found "Continue uploading" popup - attempting to click...');
+                                                if (progressCallback) progressCallback('🔄 Clicking "Continue uploading" popup...');
+                                                
+                                                // Enhanced clicking with multiple methods
+                                                try {
+                                                    // Method 1: Ensure visibility and focus
+                                                    await page.bringToFront();
+                                                    await continueButton.scrollIntoView();
+                                                    await page.waitForTimeout(500);
+                                                    
+                                                    // Method 2: Standard click
+                                                    await continueButton.click();
+                                                    console.log('✅ Standard click successful');
+                                                } catch (clickError1) {
+                                                    console.log('⚠️ Standard click failed, trying evaluate click...');
+                                                    try {
+                                                        // Method 3: JavaScript click
+                                                        await continueButton.evaluate(el => el.click());
+                                                        console.log('✅ JavaScript click successful');
+                                                    } catch (clickError2) {
+                                                        console.log('⚠️ JavaScript click failed, trying coordinate click...');
+                                                        try {
+                                                            // Method 4: Coordinate click
+                                                            const box = await continueButton.boundingBox();
+                                                            if (box) {
+                                                                await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+                                                                console.log('✅ Coordinate click successful');
+                                                            }
+                                                        } catch (clickError3) {
+                                                            console.error('❌ All click methods failed:', clickError3.message);
+                                                            continue; // Try next selector
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds after click
+                                                console.log('✅ "Continue uploading" popup clicked successfully');
+                                                foundButton = true;
+                                                break;
+                                            } else {
+                                                console.log(`⚠️ Button found but text doesn't match: "${buttonText}"`);
+                                            }
                                         }
                                     } catch (popupError) {
+                                        console.log(`⚠️ Selector failed: ${popupError.message}`);
                                         // Continue to next selector if this one fails
                                     }
                                 }
+                                
+                                if (!foundButton) {
+                                    console.log('🔍 No "Continue uploading" popup found in this check');
+                                }
+                                
                             } catch (popupCheckError) {
-                                // Continue monitoring if popup check fails
+                                console.log('⚠️ Continue uploading check failed:', popupCheckError.message);
                             }
                             
                             // Check if upload badge has disappeared
