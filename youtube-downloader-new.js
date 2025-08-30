@@ -99,16 +99,50 @@ async function downloadYouTubeVideo(url, progressCallback) {
             const resolution = resolutionValue !== 'Unknown' ? `${resolutionValue}p` : 'Unknown';
             console.log(`📺 Video Resolution: ${width}x${height} (${resolution})`);
 
+            // Check video duration and apply random trimming for long videos
+            const duration = metadata.duration || 0;
+            const durationMinutes = Math.floor(duration / 60);
+            console.log(`⏱️ Video Duration: ${durationMinutes} minutes`);
+
+            let formatArgs = ['bestvideo+bestaudio/best'];
+            
+            if (duration > 3600) { // Over 1 hour (3600 seconds)
+                // Generate random duration between 53-70 minutes
+                const minDuration = 53 * 60; // 53 minutes in seconds
+                const maxDuration = 70 * 60; // 70 minutes in seconds
+                const randomDuration = Math.floor(Math.random() * (maxDuration - minDuration + 1)) + minDuration;
+                const randomMinutes = Math.floor(randomDuration / 60);
+                
+                // Random start time (ensure we don't exceed video length)
+                const maxStartTime = duration - randomDuration;
+                const startTime = Math.floor(Math.random() * maxStartTime);
+                const endTime = startTime + randomDuration;
+                
+                console.log(`✂️ Long video detected (${durationMinutes}min) - trimming to ${randomMinutes}min`);
+                console.log(`📍 Trim: ${Math.floor(startTime/60)}:${String(startTime%60).padStart(2,'0')} - ${Math.floor(endTime/60)}:${String(endTime%60).padStart(2,'0')}`);
+                
+                formatArgs = [
+                    'bestvideo+bestaudio/best',
+                    '--postprocessor-args', `ffmpeg:-ss ${startTime} -t ${randomDuration}`
+                ];
+            }
+
             // Download best available quality (no resolution limit)
             const ytdlpArgs = [
-                '--format', 'bestvideo+bestaudio/best',
+                '--format', formatArgs[0],
                 '--output', outputPath,
                 '--no-playlist',
                 '--write-info-json',
                 '--ffmpeg-location', FFMPEG_PATH,
-                '--merge-output-format', 'mp4',
-                '--postprocessor-args', 'ffmpeg:-c:v copy -c:a aac -strict -2'
+                '--merge-output-format', 'mp4'
             ];
+
+            // Add trimming args for long videos, otherwise use default postprocessor args
+            if (duration > 3600 && formatArgs.length > 1) {
+                ytdlpArgs.push(formatArgs[1], formatArgs[2]); // Add --postprocessor-args with trimming
+            } else {
+                ytdlpArgs.push('--postprocessor-args', 'ffmpeg:-c:v copy -c:a aac -strict -2');
+            }
             
             // Add cookies if file exists (EXACTLY like reference app)
             if (fs.existsSync(cookiesPath)) {

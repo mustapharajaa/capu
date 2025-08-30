@@ -15,7 +15,7 @@ node setup.js
 
 1, edit .env details                                       
 
-FFMPEG_PATH=# FFMPEG_PATH will use npm package fallback - comment out or remove the line above
+FFMPEG_PATH= #FFMPEG_PATH will use npm package fallback - comment out or remove the line above
 
 2, npm run start
 
