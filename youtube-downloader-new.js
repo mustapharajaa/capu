@@ -123,7 +123,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
                 
                 formatArgs = [
                     'bestvideo+bestaudio/best',
-                    '--postprocessor-args', `ffmpeg:-ss ${startTime} -t ${randomDuration} -avoid_negative_ts make_zero -map 0:v:0 -map 0:a:0 -c:v copy -c:a aac`
+                    '--postprocessor-args', `ffmpeg:-ss ${startTime} -t ${randomDuration} -avoid_negative_ts make_zero -map 0:v:0? -map 0:a:0? -c:v copy -c:a aac`
                 ];
             }
 
