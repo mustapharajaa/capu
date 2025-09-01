@@ -196,55 +196,84 @@ async function downloadYouTubeVideo(url, progressCallback) {
                 }
             };
 
-            ytDlpWrap.exec(ytdlpArgs)
-                .on('progress', (progress) => {
-                    const percent = progress.percent ? progress.percent.toFixed(1) : 0;
-                    const speed = progress.currentSpeed || 'N/A';
-                    const message = `📥 Downloading: ${percent}% | ${speed}`;
-                    
-                    // Single line progress like npm
-                    process.stdout.write(`\r${message.padEnd(50)}`);
-                    
-                    if (progressCallback) progressCallback({ message: `Downloading... ${percent}% at ${speed}`, progress: percent });
-                })
-                .on('ytDlpEvent', (eventType, eventData) => {
-                    // Show format selection with resolution info
-                    if (eventType === 'info' && eventData.includes('Downloading 1 format')) {
-                        // Extract format numbers and show with resolution
-                        const formatMatch = eventData.match(/Downloading 1 format\(s\): (.+)/);
-                        if (formatMatch) {
-                            const formats = formatMatch[1];
-                            console.log(`📋 Selected formats: ${formats} (${resolution})`);
-                        } else {
-                            console.log(`📋 ${eventData}`);
-                        }
-                    }
-                    
-                    if (eventType === 'Merger' || eventData.includes('Merging formats')) {
-                        console.log(`🔧 FFmpeg: ${eventData}`);
-                    }
-                    
-                    if (progressCallback) progressCallback({ message: `[${eventType}] ${eventData}` });
-                })
-                .on('error', (error) => {
-                    // Restore original console methods on error
-                    process.stdout.write = originalWrite;
-                    console.log = originalLog;
-                    
-                    console.error('Error during download:', error);
-                    if (progressCallback) progressCallback({ message: `Error: ${error.message}` });
-                    reject(error);
-                })
-                .on('close', () => {
-                    // Restore original console methods
-                    process.stdout.write = originalWrite;
-                    console.log = originalLog;
-                    
-                    console.log(`\n✅ Download finished: ${outputPath}`);
-                    updateVideosJson(sanitizedTitle, metadata.description, 'downloaded', timestamp, outputFilename);
-                    if (progressCallback) progressCallback({ message: `DOWNLOADED: ${outputPath}`, progress: 100, isComplete: true, finalPath: outputPath });
-                    resolve(outputPath);
+            // Retry logic for HTTP 416 errors
+            let retryCount = 0;
+            const maxRetries = 3;
+            
+            const attemptDownload = async () => {
+                return new Promise((resolveAttempt, rejectAttempt) => {
+                    ytDlpWrap.exec(ytdlpArgs)
+                        .on('progress', (progress) => {
+                            const percent = progress.percent ? progress.percent.toFixed(1) : 0;
+                            const speed = progress.currentSpeed || 'N/A';
+                            const message = `📥 Downloading: ${percent}% | ${speed}`;
+                            
+                            // Single line progress like npm
+                            process.stdout.write(`\r${message.padEnd(50)}`);
+                            
+                            if (progressCallback) progressCallback({ message: `Downloading... ${percent}% at ${speed}`, progress: percent });
+                        })
+                        .on('ytDlpEvent', (eventType, eventData) => {
+                            // Show format selection with resolution info
+                            if (eventType === 'info' && eventData.includes('Downloading 1 format')) {
+                                // Extract format numbers and show with resolution
+                                const formatMatch = eventData.match(/Downloading 1 format\(s\): (.+)/);
+                                if (formatMatch) {
+                                    const formats = formatMatch[1];
+                                    console.log(`📋 Selected formats: ${formats} (${resolution})`);
+                                } else {
+                                    console.log(`📋 ${eventData}`);
+                                }
+                            }
+                            
+                            if (eventType === 'Merger' || eventData.includes('Merging formats')) {
+                                console.log(`🔧 FFmpeg: ${eventData}`);
+                            }
+                            
+                            if (progressCallback) progressCallback({ message: `[${eventType}] ${eventData}` });
+                        })
+                        .on('error', (error) => {
+                            // Restore original console methods on error
+                            process.stdout.write = originalWrite;
+                            console.log = originalLog;
+                            
+                            // Check for HTTP 416 error and retry
+                            if (error.message.includes('HTTP Error 416') && retryCount < maxRetries) {
+                                retryCount++;
+                                console.log(`⚠️ HTTP 416 error (attempt ${retryCount}/${maxRetries}) - retrying with fresh download...`);
+                                
+                                // Add --no-continue flag to prevent resume attempts
+                                const freshArgs = [...ytdlpArgs];
+                                if (!freshArgs.includes('--no-continue')) {
+                                    freshArgs.splice(-1, 0, '--no-continue'); // Insert before URL
+                                }
+                                
+                                setTimeout(() => {
+                                    ytdlpArgs.splice(0, ytdlpArgs.length, ...freshArgs);
+                                    attemptDownload().then(resolveAttempt).catch(rejectAttempt);
+                                }, 2000); // Wait 2 seconds before retry
+                                return;
+                            }
+                            
+                            console.error('Error during download:', error);
+                            if (progressCallback) progressCallback({ message: `Error: ${error.message}` });
+                            rejectAttempt(error);
+                        })
+                        .on('close', () => {
+                            // Restore original console methods
+                            process.stdout.write = originalWrite;
+                            console.log = originalLog;
+                            
+                            console.log(`\n✅ Download finished: ${outputPath}`);
+                            updateVideosJson(sanitizedTitle, metadata.description, 'downloaded', timestamp, outputFilename);
+                            if (progressCallback) progressCallback({ message: `DOWNLOADED: ${outputPath}`, progress: 100, isComplete: true, finalPath: outputPath });
+                            resolveAttempt(outputPath);
+                        });
                 });
+            };
+            
+            // Start download with retry logic
+            attemptDownload().then(resolve).catch(reject);
 
         } catch (error) {
             console.error('An error occurred in downloadYouTubeVideo:', error);
