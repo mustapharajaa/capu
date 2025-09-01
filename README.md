@@ -12,7 +12,8 @@ in terminal not shell RUN THIS COMMANDS
 npm cache clean --force
 npm install
 node setup.js 
-
+                      if any package error  run rmdir /s /q node_modules
+                      
 1, edit .env details                                       
 
 FFMPEG_PATH= #FFMPEG_PATH will use npm package fallback - comment out or remove the line above

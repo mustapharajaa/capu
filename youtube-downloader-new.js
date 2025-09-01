@@ -107,9 +107,9 @@ async function downloadYouTubeVideo(url, progressCallback) {
             let formatArgs = ['bestvideo+bestaudio/best'];
             
             if (duration > 3600) { // Over 1 hour (3600 seconds)
-                // Generate random duration between 53-70 minutes
-                const minDuration = 53 * 60; // 53 minutes in seconds
-                const maxDuration = 70 * 60; // 70 minutes in seconds
+                // Generate random duration between 37-49 minutes
+                const minDuration = 49 * 60; // 37 minutes in seconds
+                const maxDuration = 63 * 60; // 49 minutes in seconds
                 const randomDuration = Math.floor(Math.random() * (maxDuration - minDuration + 1)) + minDuration;
                 const randomMinutes = Math.floor(randomDuration / 60);
                 
@@ -134,7 +134,10 @@ async function downloadYouTubeVideo(url, progressCallback) {
                 '--no-playlist',
                 '--write-info-json',
                 '--ffmpeg-location', FFMPEG_PATH,
-                '--merge-output-format', 'mp4'
+                '--merge-output-format', 'mp4',
+                '--no-part',  // Avoid .part files that can cause access issues
+                '--retries', '5',  // Retry failed downloads
+                '--fragment-retries', '5'  // Retry failed fragments
             ];
 
             // Add trimming args for long videos, otherwise use CapCut-optimized postprocessor args
