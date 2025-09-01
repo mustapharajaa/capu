@@ -316,9 +316,9 @@ class BatchProcessor {
                     this.recentlyStarted = 0;
                 }
                 
-                if (effectiveRunningCount >= 3) {
-                    if (runningCount >= 3) {
-                        console.log(`⏳ Maximum concurrent limit reached (${runningCount}/3 running) - waiting 3 minutes before retry...`);
+                if (effectiveRunningCount >= 7) {
+                    if (runningCount >= 7) {
+                        console.log(`⏳ Maximum concurrent limit reached (${runningCount}/7 running) - waiting 3 minutes before retry...`);
                     } else {
                         console.log(`⏳ Recently started automations not yet marked as running (${runningCount} running + ${this.recentlyStarted} starting = ${effectiveRunningCount}) - waiting 3 minutes...`);
                     }
