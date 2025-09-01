@@ -49,26 +49,6 @@ async function downloadYouTubeVideo(url, progressCallback) {
             const timestamp = Date.now();
             const cookiesPath = path.join(__dirname, 'youtube-cookies.txt');
 
-            // Check if video was already processed successfully
-            const videosJsonPath = path.join(__dirname, 'videos.json');
-            if (fs.existsSync(videosJsonPath)) {
-                try {
-                    const videosData = JSON.parse(fs.readFileSync(videosJsonPath, 'utf8'));
-                    const existingVideo = videosData.videos?.find(v => v.url === url && v.status === 'downloaded');
-                    if (existingVideo) {
-                        const existingPath = path.join(UPLOADS_DIR, existingVideo.filename);
-                        if (fs.existsSync(existingPath)) {
-                            console.log(`✅ Video already downloaded: ${existingVideo.filename}`);
-                            if (progressCallback) progressCallback({ message: `Already downloaded: ${existingVideo.filename}`, progress: 100, isComplete: true, finalPath: existingPath });
-                            resolve(existingPath);
-                            return;
-                        }
-                    }
-                } catch (error) {
-                    console.log('⚠️ Could not check existing downloads, proceeding with download...');
-                }
-            }
-
             // Get video metadata first to get the title for the filename
             console.log('Fetching video metadata...');
             let metadata;
@@ -175,7 +155,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
                 console.log('⚠️ No cookies file found - downloads may be limited by bot detection');
             }
             
-            ytdlpArgs.push(url);
+            ytdlpArgs.push('--no-continue', url);
 
             console.log(`🔧 FFmpeg Path: ${FFMPEG_PATH}`);
             console.log(`Executing: ${YTDLP_BINARY_PATH} ${ytdlpArgs.join(' ')}`);
@@ -261,7 +241,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
                     console.log = originalLog;
                     
                     console.log(`\n✅ Download finished: ${outputPath}`);
-            updateVideosJson(sanitizedTitle, metadata.description, 'downloaded', timestamp, outputFilename, url);
+                    updateVideosJson(sanitizedTitle, metadata.description, 'downloaded', timestamp, outputFilename);
                     if (progressCallback) progressCallback({ message: `DOWNLOADED: ${outputPath}`, progress: 100, isComplete: true, finalPath: outputPath });
                     resolve(outputPath);
                 });
@@ -274,7 +254,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
     });
 }
 
-function updateVideosJson(videoName, description, status, timestamp, filename, url) {
+function updateVideosJson(videoName, description, status, timestamp, filename) {
     const videosJsonPath = path.join(__dirname, 'videos.json');
     let videosData = { videos: [] };
 
@@ -293,16 +273,15 @@ function updateVideosJson(videoName, description, status, timestamp, filename, u
         }
     }
 
-    // Check for duplicates before adding (by URL or filename)
-    const existingVideo = videosData.videos.find(v => v.filename === filename || v.url === url);
+    // Check for duplicates before adding
+    const existingVideo = videosData.videos.find(v => v.filename === filename);
     if (!existingVideo) {
         videosData.videos.push({
             name: videoName,
             description: description || '',
             status: status,
             timestamp: timestamp,
-            filename: filename,
-            url: url
+            filename: filename
         });
         fs.writeFileSync(videosJsonPath, JSON.stringify(videosData, null, 2));
         console.log(`Updated videos.json with new entry: ${videoName}`);
