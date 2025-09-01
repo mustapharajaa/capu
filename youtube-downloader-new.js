@@ -144,8 +144,8 @@ async function downloadYouTubeVideo(url, progressCallback) {
             if (duration > 3600 && formatArgs.length > 1) {
                 ytdlpArgs.push(formatArgs[1], formatArgs[2]); // Add --postprocessor-args with trimming
             } else {
-                // Optimized for CapCut background removal: consistent fps, proper pixel format, quality balance
-                ytdlpArgs.push('--postprocessor-args', 'ffmpeg:-c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p -r 30 -vf scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2 -c:a aac -b:a 128k');
+                // Fast processing - no re-encoding
+                ytdlpArgs.push('--postprocessor-args', 'ffmpeg:-c:v copy -c:a aac -strict -2');
             }
             
             // Add cookies if file exists (EXACTLY like reference app)
