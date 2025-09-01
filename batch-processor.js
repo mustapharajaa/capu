@@ -316,9 +316,9 @@ class BatchProcessor {
                     this.recentlyStarted = 0;
                 }
                 
-                if (effectiveRunningCount >= 7) {
-                    if (runningCount >= 7) {
-                        console.log(`⏳ Maximum concurrent limit reached (${runningCount}/7 running) - waiting 3 minutes before retry...`);
+                if (effectiveRunningCount >= 3) {
+                    if (runningCount >= 3) {
+                        console.log(`⏳ Maximum concurrent limit reached (${runningCount}/3 running) - waiting 3 minutes before retry...`);
                     } else {
                         console.log(`⏳ Recently started automations not yet marked as running (${runningCount} running + ${this.recentlyStarted} starting = ${effectiveRunningCount}) - waiting 3 minutes...`);
                     }
@@ -348,11 +348,11 @@ class BatchProcessor {
                 
                 // Check if we need to wait 3 minutes since last automation start
                 const timeSinceLastAutomation = Date.now() - this.lastAutomationStart;
-                const minDelayBetweenAutomations = 60000; // 1 minute in milliseconds
+                const minDelayBetweenAutomations = 180000; // 3 minutes in milliseconds
                 
                 if (this.lastAutomationStart > 0 && timeSinceLastAutomation < minDelayBetweenAutomations) {
                     const remainingWait = Math.ceil((minDelayBetweenAutomations - timeSinceLastAutomation) / 1000);
-                    console.log(`⏳ Waiting ${remainingWait} seconds before starting next automation (1-minute spacing)...`);
+                    console.log(`⏳ Waiting ${remainingWait} seconds before starting next automation (3-minute spacing)...`);
                     await new Promise(resolve => setTimeout(resolve, minDelayBetweenAutomations - timeSinceLastAutomation));
                 }
                 
