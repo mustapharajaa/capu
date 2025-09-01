@@ -320,17 +320,17 @@ class BatchProcessor {
                     if (runningCount >= 3) {
                         console.log(`⏳ Maximum concurrent limit reached (${runningCount}/3 running) - waiting 3 minutes before retry...`);
                     } else {
-                        console.log(`⏳ Recently started automations not yet marked as running (${runningCount} running + ${this.recentlyStarted} starting = ${effectiveRunningCount}) - waiting 1 minute...`);
+                        console.log(`⏳ Recently started automations not yet marked as running (${runningCount} running + ${this.recentlyStarted} starting = ${effectiveRunningCount}) - waiting 3 minutes...`);
                     }
-                    await new Promise(resolve => setTimeout(resolve, 60000)); // Wait 1 minute (60 seconds)
+                    await new Promise(resolve => setTimeout(resolve, 180000)); // Wait 3 minutes (180 seconds)
                     continue;
                 }
 
                 // Check for available editors
                 const availableEditorsCount = this.getAvailableEditorsCount();
                 if (availableEditorsCount === 0) {
-                    console.log('⏳ No editors available - waiting 1 minute before retry...');
-                    await new Promise(resolve => setTimeout(resolve, 60000)); // Wait 1 minute (60 seconds)
+                    console.log('⏳ No editors available - waiting 3 minutes before retry...');
+                    await new Promise(resolve => setTimeout(resolve, 180000)); // Wait 3 minutes (180 seconds)
                     continue;
                 }
 
@@ -340,7 +340,7 @@ class BatchProcessor {
                 if (urls.length === 0) {
                     console.log('📄 Queue is empty - waiting for new videos...');
                     // Don't break - keep monitoring for new videos
-                    await new Promise(resolve => setTimeout(resolve, 60000)); // Wait 1 minute (60 seconds)
+                    await new Promise(resolve => setTimeout(resolve, 180000)); // Wait 3 minutes (180 seconds)
                     continue;
                 }
 
