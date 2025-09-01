@@ -123,7 +123,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
                 
                 formatArgs = [
                     'bestvideo+bestaudio/best',
-                    '--postprocessor-args', `ffmpeg:-ss ${startTime} -t ${randomDuration} -avoid_negative_ts make_zero -map 0:v:0? -map 0:a:0? -c:v copy -c:a aac`
+                    '--postprocessor-args', `ffmpeg:-ss ${startTime} -t ${randomDuration} -avoid_negative_ts make_zero -map 0:v:0? -map 0:a:0? -c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p -r 30 -vf scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2 -c:a aac -b:a 128k -ar 44100`
                 ];
             }
 
@@ -144,8 +144,8 @@ async function downloadYouTubeVideo(url, progressCallback) {
             if (duration > 3600 && formatArgs.length > 1) {
                 ytdlpArgs.push(formatArgs[1], formatArgs[2]); // Add --postprocessor-args with trimming
             } else {
-                // Fast processing - no re-encoding
-                ytdlpArgs.push('--postprocessor-args', 'ffmpeg:-c:v copy -c:a aac -strict -2');
+                // CapCut-optimized transcoding for web processing
+                ytdlpArgs.push('--postprocessor-args', 'ffmpeg:-c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p -r 30 -vf scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2 -c:a aac -b:a 128k -ar 44100');
             }
             
             // Add cookies if file exists (EXACTLY like reference app)
