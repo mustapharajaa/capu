@@ -346,13 +346,13 @@ class BatchProcessor {
 
                 console.log(`📋 Found ${urls.length} URLs in queue, ${availableEditorsCount} editors available`);
                 
-                // Check if we need to wait 1 minute since last automation start
+                // Check if we need to wait 3 minutes since last automation start
                 const timeSinceLastAutomation = Date.now() - this.lastAutomationStart;
-                const minDelayBetweenAutomations = 60000; // 1 minute in milliseconds
+                const minDelayBetweenAutomations = 180000; // 3 minutes in milliseconds
                 
                 if (this.lastAutomationStart > 0 && timeSinceLastAutomation < minDelayBetweenAutomations) {
                     const remainingWait = Math.ceil((minDelayBetweenAutomations - timeSinceLastAutomation) / 1000);
-                    console.log(`⏳ Waiting ${remainingWait} seconds before starting next automation (1-minute spacing)...`);
+                    console.log(`⏳ Waiting ${remainingWait} seconds before starting next automation (3-minute spacing)...`);
                     await new Promise(resolve => setTimeout(resolve, minDelayBetweenAutomations - timeSinceLastAutomation));
                 }
                 
