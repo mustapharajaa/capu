@@ -150,24 +150,11 @@ class BatchProcessor {
 
             const editorsData = JSON.parse(fs.readFileSync(this.editorsFile, 'utf8'));
             const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
-            
-            // Count running automations (in-use editors with running-like results)
-            const runningAutomations = editors.filter(editor => 
-                editor.status === 'in-use' && 
-                (editor.result === 'running' || editor.result.includes('runn'))
-            ).length;
-            
-            // If 3 or more automations are running, don't start new downloads
-            if (runningAutomations >= 3) {
-                console.log(`📊 ${runningAutomations} automations running - blocking new downloads until capacity available`);
-                return false;
-            }
-            
             const availableEditors = editors.filter(editor => 
                 editor.status === 'available' && editor.result !== 'running'
             );
             
-            console.log(`📊 Editor availability: ${availableEditors.length}/${editors.length} available (${runningAutomations} running)`);
+            console.log(`📊 Editor availability: ${availableEditors.length}/${editors.length} available (status='available' AND result!='running')`);
             return availableEditors.length > 0;
         } catch (error) {
             console.error('❌ Error checking editor availability:', error.message);
