@@ -11,7 +11,7 @@ puppeteer.use(StealthPlugin());
 const googleSheets = new GoogleSheetsService();
 
 // User data directory for persistent browser sessions (like reference app)
-const USER_DATA_DIR = path.join(__dirname, 'puppeteer_data');
+const USER_DATA_DIR = path.join(__dirname, '../puppeteer_data');
 
 // Global browser instance for reuse
 let globalBrowser = null;
@@ -23,11 +23,11 @@ let runningEditorTabs = new Map(); // Map of editorId -> page
 // Tab switching management functions
 function startTabSwitching() {
     try {
-        const editorsPath = path.join(__dirname, 'editors.json');
+        const editorsPath = path.join(__dirname, '../config/editors.json');
         if (!fs.existsSync(editorsPath)) return;
-        
+
         const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
-        
+
         // Check if editors.json has new structure with tabSwitching config
         let tabSwitchingConfig;
         if (editorsData.tabSwitching) {
@@ -36,13 +36,13 @@ function startTabSwitching() {
             // Default config for old structure
             tabSwitchingConfig = { enabled: true, intervalSeconds: 10 };
         }
-        
+
         if (!tabSwitchingConfig.enabled || runningEditorTabs.size < 2) return;
-        
+
         if (tabSwitchingInterval) clearInterval(tabSwitchingInterval);
-        
+
         let currentTabIndex = 0;
-        
+
         tabSwitchingInterval = setInterval(async () => {
             const tabArray = Array.from(runningEditorTabs.values()); // Get fresh tab array each time
             if (tabArray.length > 1) {
@@ -59,7 +59,7 @@ function startTabSwitching() {
                 }
             }
         }, tabSwitchingConfig.intervalSeconds * 1000);
-        
+
         console.log(`🔄 Tab switching enabled: ${tabSwitchingConfig.intervalSeconds}s interval`);
     } catch (error) {
         console.log('⚠️ Tab switching setup failed:', error.message);
@@ -95,19 +95,19 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
     let browser = null;
     let page = null;
     let editorUrl = null;
-    
+
     try {
         console.log('🚀 Starting CapCut automation...');
-        
+
         // Set editor status to "in-use" when automation starts
         try {
-            const editorsPath = path.join(__dirname, 'editors.json');
+            const editorsPath = path.join(__dirname, '../config/editors.json');
             if (fs.existsSync(editorsPath)) {
                 const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
-                
+
                 // Handle both old array structure and new object structure
                 const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
-                
+
                 // Find an available editor and mark it as in-use
                 const availableEditor = editors.find(editor => editor.status === 'available');
                 if (availableEditor) {
@@ -129,7 +129,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             // Don't log here - error already logged above, just re-throw to stop automation
             throw statusError;
         }
-        
+
         // Function to connect to existing browser or launch a new one
         async function getBrowserInstance(editorId) {
             // Check if we have a global browser and it's still connected
@@ -175,7 +175,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     '--start-maximized'
                 ],
                 executablePath: process.env.CHROME_PATH || undefined,
-                userDataDir: path.join(__dirname, 'puppeteer_data'),
+                userDataDir: path.join(__dirname, '../puppeteer_data'),
                 defaultViewport: null,
                 ignoreDefaultArgs: ['--disable-extensions'],
                 protocolTimeout: 18000000 // 300 minutes for slow RDP environments
@@ -201,11 +201,11 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         browser = await getBrowserInstance(editorUrl);
         page = await browser.newPage();
         console.log('🌐 Created new tab for automation');
-        
+
         // Register this tab for switching if multiple automations are running
         const editorId = editorUrl ? editorUrl.split('/editor/')[1]?.split('?')[0] : 'unknown';
         addEditorTab(editorId, page);
-        
+
         // Ensure browser window is maximized and visible
         try {
             // Force window to maximize and focus
@@ -222,22 +222,22 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     document.dispatchEvent(new Event('visibilitychange'));
                 }
             });
-            
+
             // Bring to front
             await page.bringToFront();
             console.log('✅ Browser window maximized to full screen and brought to front');
         } catch (error) {
             console.log('⚠️ Could not ensure window visibility:', error.message);
         }
-        
+
         // RDP-compatible helper functions for reliable interactions
         async function rdpSafeClick(selector, options = {}) {
             const element = await page.waitForSelector(selector, { visible: true, timeout: 30000, ...options });
-            
+
             // Ensure browser window is focused and visible
             await page.bringToFront();
             await page.evaluate(() => window.focus());
-            
+
             // Multiple click methods for RDP compatibility
             try {
                 // Method 1: Standard click
@@ -275,7 +275,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 }
             }
         }
-        
+
         async function ensureBrowserFocus() {
             try {
                 await page.bringToFront();
@@ -289,12 +289,12 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 console.log('⚠️ Could not ensure browser focus:', error.message);
             }
         }
-        
+
         // Set viewport to match reference app
         await page.setViewport({ width: 1280, height: 720 });
-        
+
         // Load cookies if available
-        const cookiesPath = path.join(__dirname, 'cookies.json');
+        const cookiesPath = path.join(__dirname, '../config/cookies.json');
         if (fs.existsSync(cookiesPath)) {
             try {
                 const cookies = JSON.parse(fs.readFileSync(cookiesPath, 'utf8'));
@@ -315,15 +315,15 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 
         // Use the editorUrl from status management, or set fallback if not set
         if (!editorUrl) {
-            const editorsPath = path.join(__dirname, 'editors.json');
+            const editorsPath = path.join(__dirname, '../config/editors.json');
             editorUrl = 'https://www.capcut.com/editor'; // fallback
-            
+
             if (fs.existsSync(editorsPath)) {
                 try {
                     const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
                     const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
                     const availableEditors = editors.filter(editor => editor.status === 'available');
-                    
+
                     if (availableEditors.length > 0) {
                         editorUrl = availableEditors[0].url; // Use first available editor
                     } else if (editors.length > 0) {
@@ -334,11 +334,11 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 }
             }
         }
-        
+
         console.log(`✅ Using editor: ${editorUrl.substring(0, 50)}...`);
 
         console.log('🌐 Loading CapCut...');
-        await page.goto(editorUrl, { 
+        await page.goto(editorUrl, {
             waitUntil: 'networkidle2',
             timeout: 420000  // 7 minutes for very slow CapCut loading
         });
@@ -353,7 +353,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 const loadingElement = document.querySelector("#timeline > div > div.timeline-loading-text-WcR4E_");
                 return !loadingElement || loadingElement.style.display === 'none';
             }, { timeout: 360000 }); // 6 minutes for timeline loading
-            
+
             console.log('✅ Timeline loaded successfully');
             if (progressCallback) progressCallback('✅ Timeline ready, starting upload...');
         } catch (error) {
@@ -368,10 +368,10 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 
         // Initiate the file chooser using reference app method
         console.log('📁 Opening file chooser...');
-        
+
         // Ensure browser is focused before file chooser interaction
         await ensureBrowserFocus();
-        
+
         const [fileChooser] = await Promise.all([
             page.waitForFileChooser({ timeout: 300000 }),  // 5 minutes
             // RDP-compatible way to click the 'Upload file' button inside the panel
@@ -387,7 +387,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         }
                         return false;
                     });
-                    
+
                     if (!uploadFileSpan) {
                         // Fallback: try upload area selector
                         const uploadAreaSelector = 'div[class*="upload-item-content"]';
@@ -410,7 +410,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         if (progressCallback) progressCallback('📤 Monitoring upload...');
 
         console.log('⏳ Monitoring upload...');
-        
+
         // Wait for video to appear in media panel (reference app method)
         const videoFileName = path.basename(videoPath);
         console.log(`Waiting for uploaded video "${videoFileName}" to appear in media panel...`);
@@ -420,13 +420,13 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         const totalTimeout = 1200000; // 20 minutes total
         const startTime = Date.now();
         let attemptCount = 0;
-        
+
         while (!videoTextElement && (Date.now() - startTime) < totalTimeout) {
             attemptCount++;
             const elapsed = Math.round((Date.now() - startTime) / 1000);
             const remaining = Math.round((totalTimeout - (Date.now() - startTime)) / 1000);
             console.log(`🔍 Video detection attempt ${attemptCount} (${elapsed}s elapsed, ${remaining}s remaining)...`);
-            
+
             // Method 1: Try XPath selectors
             try {
                 const videoElementXPath = `//div[(contains(@class, 'card-item-label') or contains(@class, 'card-item-label-wBnw6O') or contains(@class, 'card-item-label-')) and text()='${videoFileName}'] | //html[1]/body[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[3]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[2][text()='${videoFileName}'] | //html[1]/body[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[3]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[1][text()='${videoFileName}']`;
@@ -439,7 +439,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             } catch (xpathError) {
                 // Continue to next method
             }
-            
+
             // Method 2: Try CSS selectors with text matching
             if (!videoTextElement) {
                 console.log('🔍 Trying CSS selectors with text matching...');
@@ -449,7 +449,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     `div[class*="card-item-label"]`,
                     `div[class*="card-item-label-"]`
                 ];
-                
+
                 for (const selector of cssSelectors) {
                     try {
                         const elements = await page.$$(selector);
@@ -467,7 +467,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     }
                 }
             }
-            
+
             // Method 3: Try video card elements (no text matching)
             if (!videoTextElement) {
                 console.log('🔍 Trying video card elements as fallback...');
@@ -477,17 +477,17 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     'div[id*="cloud-material-item-"]',
                     '//*[@id and contains(@id, "cloud-material-item-")]/div/div[1]'
                 ];
-                
+
                 for (const selector of cardSelectors) {
                     try {
                         let cardElements;
-                        
+
                         if (selector.startsWith('//')) {
                             cardElements = await page.$x(selector);
                         } else {
                             cardElements = await page.$$(selector);
                         }
-                        
+
                         if (cardElements && cardElements.length > 0) {
                             console.log(`✅ Found ${cardElements.length} video card(s) with selector: ${selector}`);
                             console.log('✅ Using first video card as fallback (no text matching)');
@@ -499,14 +499,14 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     }
                 }
             }
-            
+
             // If still not found, wait and retry (but check time limit)
             if (!videoTextElement && (Date.now() - startTime) < totalTimeout) {
                 console.log(`⏳ Video not found yet, waiting 10 seconds before next attempt...`);
                 await page.waitForTimeout(10000); // Shorter wait between attempts
             }
         }
-        
+
         if (!videoTextElement) {
             throw new Error(`Could not find video "${videoFileName}" in media panel after 20 minutes of trying all selector methods`);
         }
@@ -557,7 +557,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         // Wait for upload badge to disappear before adding to timeline
         console.log('🔍 Checking for upload badge...');
         if (progressCallback) progressCallback('🔍 Waiting for upload badge to clear...');
-        
+
         try {
             const uploadBadgeSelectors = [
                 // Your exact selectors from the HTML
@@ -570,14 +570,14 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 'xpath//span[@class="lv-badge-number badge-dwkIhr badge-zoom-enter-done"]',
                 'xpath//*[@id="workbench"]/div[1]/div/div[2]/div/div/div/div[1]/div[1]/div[2]/span/span'
             ];
-            
+
             let uploadBadgeFound = false;
             let loadingElement = null;
-            
+
             // Check for loading image with short timeout
             for (const selector of uploadBadgeSelectors) {
                 try {
-                    console.log(`🔍 Testing upload badge selector: ${selector}`);
+                    // console.log(`🔍 Testing upload badge selector: ${selector}`);
                     let badgeElement;
                     if (selector.startsWith('xpath//')) {
                         const xpath = selector.replace('xpath//', '');
@@ -585,7 +585,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     } else {
                         badgeElement = await page.$(selector);
                     }
-                    
+
                     if (badgeElement) {
                         // Get the badge text/content for debugging
                         const badgeText = await badgeElement.evaluate(el => el.textContent || el.innerText || 'no text');
@@ -593,15 +593,15 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         console.log(`🔍 Found upload badge with selector: ${selector}`);
                         console.log(`📊 Badge content: "${badgeText}"`);
                         if (progressCallback) progressCallback(`⏳ Upload badge detected (${badgeText}), waiting for completion...`);
-                        
+
                         // Wait for badge to disappear (up to 40 minutes) with popup monitoring
                         console.log('⏳ Waiting for upload badge to disappear (up to 40 minutes)...');
-                        
+
                         // Monitor for both badge disappearance and "Continue uploading" popup
                         const startTime = Date.now();
                         const maxWaitTime = 2400000; // 40 minutes
                         let badgeDisappeared = false;
-                        
+
                         while (!badgeDisappeared && (Date.now() - startTime) < maxWaitTime) {
                             // Check for "Continue uploading" popup and click it
                             try {
@@ -617,7 +617,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                     'button.lv-btn.lv-btn-secondary.lv-btn-size-default.lv-btn-shape-square.max-size-modal-button:has(span:contains("Continue uploading"))',
                                     'span:contains("Continue uploading")'
                                 ];
-                                
+
                                 for (const popupSelector of continuePopupSelectors) {
                                     try {
                                         let continueButton = null;
@@ -628,7 +628,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                         } else {
                                             continueButton = await page.$(popupSelector);
                                         }
-                                        
+
                                         if (continueButton) {
                                             console.log('🔄 Found "Continue uploading" popup - clicking to continue...');
                                             if (progressCallback) progressCallback('🔄 Clicking "Continue uploading" popup...');
@@ -644,7 +644,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                             } catch (popupCheckError) {
                                 // Continue monitoring if popup check fails
                             }
-                            
+
                             // Check if upload badge has disappeared
                             try {
                                 let badgeElement = null;
@@ -658,7 +658,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                 } else {
                                     badgeElement = await page.$(selector);
                                 }
-                                
+
                                 if (!badgeElement) {
                                     badgeDisappeared = true;
                                     break;
@@ -666,31 +666,31 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                             } catch (badgeCheckError) {
                                 // Continue monitoring if badge check fails
                             }
-                            
+
                             // Wait 3 seconds before next check
                             await new Promise(resolve => setTimeout(resolve, 3000));
                         }
-                        
+
                         if (!badgeDisappeared) {
                             throw new Error('Upload badge monitoring timeout after 40 minutes');
                         }
-                        
+
                         console.log('✅ Upload badge disappeared - upload fully complete!');
                         if (progressCallback) progressCallback('✅ Upload badge cleared - ready for timeline!');
                         break;
                     } else {
-                        console.log(`❌ Upload badge NOT found with selector: ${selector}`);
+                        // console.log(`❌ Upload badge NOT found with selector: ${selector}`);
                     }
                 } catch (e) {
-                    console.log(`⚠️ Upload badge selector failed: ${selector} - ${e.message}`);
+                    // console.log(`⚠️ Upload badge selector failed: ${selector} - ${e.message}`);
                 }
             }
-            
+
             if (!uploadBadgeFound) {
                 console.log('✅ No upload badge found - upload already complete');
                 if (progressCallback) progressCallback('✅ No upload badge - ready for timeline!');
             }
-            
+
         } catch (e) {
             console.log('⚠️ Upload badge check failed, proceeding anyway:', e.message);
             if (progressCallback) progressCallback('⚠️ Upload badge check timeout - proceeding...');
@@ -698,7 +698,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 
         // Click the media item to add it to timeline with robust fallback selectors
         console.log('🎬 Adding video to timeline...');
-        
+
         let videoAddedToTimeline = false;
         const timelineAddSelectors = [
             // Method 1: Try using the existing video element (if not detached)
@@ -713,12 +713,12 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     return false;
                 }
             },
-            
+
             // Method 2: Use exact CapCut video card structure
             async () => {
                 try {
                     console.log('🔄 Method 2: Using exact CapCut card structure...');
-                    
+
                     // Target the exact CapCut video card structure
                     const cardSelectors = [
                         'div.card-item__content-nKehsC',
@@ -728,7 +728,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         '.children-BxrZUf',
                         '.card-container-tIRTNo'
                     ];
-                    
+
                     for (const selector of cardSelectors) {
                         try {
                             const elements = await page.$$(selector);
@@ -742,7 +742,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                             console.log(`⚠️ Card selector failed: ${selector}`);
                         }
                     }
-                    
+
                     // Fallback: Try to find any card with video content
                     try {
                         const videoCardXPath = '//div[contains(@class, "card-item__content") or contains(@class, "card-container")]';
@@ -755,7 +755,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     } catch (e) {
                         console.log('⚠️ XPath card selector failed:', e.message);
                     }
-                    
+
                     return false;
                 } catch (e) {
                     console.log('⚠️ Method 2 failed:', e.message);
@@ -763,7 +763,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 }
             }
         ];
-        
+
         // Try each method until one succeeds
         for (let i = 0; i < timelineAddSelectors.length; i++) {
             try {
@@ -779,7 +779,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 console.log(`⚠️ Timeline addition method ${i + 1} failed:`, e.message);
             }
         }
-        
+
         if (!videoAddedToTimeline) {
             throw new Error('Failed to add video to timeline - all selector methods failed');
         }
@@ -787,7 +787,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         // Monitor for video loading completion (if loading image appears)
         console.log('🔍 Checking for video loading indicator...');
         if (progressCallback) progressCallback('🔍 Checking for video loading...');
-        
+
         try {
             // Check if loading image is present
             const loadingImageSelectors = [
@@ -795,10 +795,10 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 'img[alt="loading"]',
                 'xpath///*[@id="workbench-editor-container"]/div[1]/div[1]/div/div/div/div/div/img'
             ];
-            
+
             let loadingImageFound = false;
             let loadingElement = null;
-            
+
             // Check for loading image with short timeout
             for (const selector of loadingImageSelectors) {
                 try {
@@ -818,7 +818,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     // Loading image not found with this selector, try next
                 }
             }
-            
+
             if (loadingImageFound && loadingElement) {
                 // Wait for loading image to disappear (up to 10 minutes)
                 console.log('⏳ Waiting for video loading to complete (up to 10 minutes)...');
@@ -835,7 +835,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 console.log('✅ No loading indicator found - video ready immediately');
                 if (progressCallback) progressCallback('✅ Video ready immediately');
             }
-            
+
         } catch (loadingError) {
             console.log('⚠️ Video loading monitor timeout or error:', loadingError.message);
             if (progressCallback) progressCallback('⚠️ Video loading monitor timeout - continuing anyway');
@@ -850,13 +850,13 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             const originalFileName = path.basename(videoPath, path.extname(videoPath));
             console.log(`📝 Changing project name to: ${originalFileName}`);
             if (progressCallback) progressCallback(`📝 Changing project name to: ${originalFileName}`);
-            
+
             // Try to find and click the project name element (reference app selectors)
             const projectNameSelectors = [
                 'div.draft-input__read-only',
                 '//*[@id="workbench"]/div[2]/div[1]/div[1]/div[2]/div/div/div/div[3]/div'
             ];
-            
+
             let projectNameElement = null;
             for (const selector of projectNameSelectors) {
                 try {
@@ -875,33 +875,33 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     console.log(`⚠️ Project name selector ${selector} failed:`, err.message);
                 }
             }
-            
+
             if (projectNameElement) {
                 // Click on the project name to edit it
                 await projectNameElement.click();
                 await page.waitForTimeout(500);
-                
+
                 // Select all and replace with new name
                 await page.keyboard.down('Control');
                 await page.keyboard.press('KeyA');
                 await page.keyboard.up('Control');
                 await page.waitForTimeout(200);
-                
+
                 await page.keyboard.type(originalFileName);
                 await page.waitForTimeout(300);
-                
+
                 // Press Enter to confirm
                 await page.keyboard.press('Enter');
                 await page.waitForTimeout(1000);
-                
+
                 console.log(`✅ Project name changed to: ${originalFileName}`);
                 if (progressCallback) progressCallback(`✅ Project name changed to: ${originalFileName}`);
-                
+
                 // Wait 10 seconds for CapCut UI to fully stabilize after project name change
                 console.log('⏳ Waiting 10 seconds for UI to stabilize after project name change...');
                 await page.waitForTimeout(10000);
                 console.log('✅ UI stabilization wait complete');
-                
+
             } else {
                 console.log('⚠️ Could not find project name element to change');
                 if (progressCallback) progressCallback('⚠️ Could not find project name element to change');
@@ -915,16 +915,16 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         try {
             console.log('🔍 Zooming in timeline 18 times for better precision...');
             if (progressCallback) progressCallback('🔍 Zooming in timeline 18 times...');
-            
+
             for (let i = 0; i < 18; i++) {
                 const clicked = await page.evaluate(() => {
                     // Find the timeline tools container
                     const timelineTools = document.querySelector('#timeline-part-view .timeline-tools-right');
                     if (!timelineTools) return false;
-                    
+
                     // Get all buttons in the timeline tools
                     const buttons = timelineTools.querySelectorAll('button');
-                    
+
                     // The 5th button should be the zoom-in button (index 4)
                     const zoomInButton = buttons[4]; // 5th button (0-indexed)
                     if (zoomInButton) {
@@ -933,7 +933,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     }
                     return false;
                 });
-                
+
                 if (clicked) {
                     console.log(`✅ Zoom-in click ${i + 1}/18`);
                     await page.waitForTimeout(300); // Small delay between clicks
@@ -954,7 +954,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         try {
             console.log('🎯 Clicking timeline canvas after zoom...');
             if (progressCallback) progressCallback('🎯 Clicking timeline canvas...');
-            
+
             const timelineCanvasSelectors = [
                 'div#timeline > div:nth-child(2) > span > span > div > div.timeline-scroll-wrap > div.timeline-bd-vertical-scroll-icatUb > div.timeline-large-container > div[role=presentation] > canvas',
                 'div.timeline-large-container > div[role=presentation] > canvas',
@@ -962,7 +962,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 'div.konvajs-content canvas',
                 '#timeline canvas'
             ];
-            
+
             let canvasClicked = false;
             for (const selector of timelineCanvasSelectors) {
                 try {
@@ -975,7 +975,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     console.log(`⚠️ Timeline canvas selector failed: ${selector}`);
                 }
             }
-            
+
             if (!canvasClicked) {
                 // Fallback: Use XPath (reference app method)
                 console.log('🔄 Trying XPath fallback for timeline canvas...');
@@ -991,7 +991,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     console.log('⚠️ XPath timeline canvas click failed:', xpathError.message);
                 }
             }
-            
+
             if (canvasClicked) {
                 await page.waitForTimeout(1000); // Wait for canvas interaction to register
                 console.log('✅ Timeline canvas clicked successfully');
@@ -1009,24 +1009,24 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         try {
             console.log('🤖 Starting Smart AI Tools - Remove Background...');
             if (progressCallback) progressCallback('🤖 Starting Smart AI Tools - Remove Background...');
-            
+
             // Click video cutout button
             await page.waitForTimeout(1000);
             const cutoutButtonSelector = '#workbench-tool-bar-toolbarVideoCutout';
             await page.click(cutoutButtonSelector);
             console.log('✅ Clicked video cutout button');
-            
+
             // Click remove backgrounds option with multiple fallbacks (automatic removal only)
             await page.waitForTimeout(2000); // Wait for UI to load
             console.log('🔍 Looking for automatic remove backgrounds option...');
-            
+
             const cutoutCardSelectors = [
                 '#cutout-card',
                 '.cutout-card'
             ];
-            
+
             let cutoutCardClicked = false;
-            
+
             // Try reliable selectors for cutout card
             for (const selector of cutoutCardSelectors) {
                 try {
@@ -1039,23 +1039,23 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     console.log(`⚠️ Cutout card selector failed: ${selector}`);
                 }
             }
-            
+
             if (!cutoutCardClicked) {
                 console.log('⚠️ Could not find remove backgrounds option, but continuing...');
             }
-            
+
             // Click cutout switch with specific background removal targeting
             await page.waitForTimeout(1000);
             console.log('🔍 Searching specifically for the background removal switch...');
             if (progressCallback) progressCallback('🔍 Searching for Remove Background switch...');
-            
+
             const switchButtonHandle = await page.evaluateHandle(() => {
                 // Method 1: Find by "Remove backgrounds automatically" text specifically
                 const automaticRemovalElements = Array.from(document.querySelectorAll('div.attribute-switch-field-des1'));
-                const automaticRemovalDiv = automaticRemovalElements.find(el => 
+                const automaticRemovalDiv = automaticRemovalElements.find(el =>
                     el.textContent.includes('Remove backgrounds automatically')
                 );
-                
+
                 if (automaticRemovalDiv) {
                     // Find the switch within the same container as the "Remove backgrounds automatically" text
                     const container = automaticRemovalDiv.closest('.video-tool-item, .cutout-card, .tool-item, .panel-item, .attribute-switch-field');
@@ -1087,11 +1087,11 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     // Skip switches in float-mode-panel-container
                     const floatModePanel = switchBtn.closest('#float-mode-panel-container');
                     if (floatModePanel) continue;
-                    
+
                     const parent = switchBtn.closest('div');
                     if (parent) {
                         const parentText = parent.innerText.toLowerCase();
-                        if (parentText.includes('remove backgrounds automatically') || 
+                        if (parentText.includes('remove backgrounds automatically') ||
                             (parentText.includes('cutout') && parentText.includes('auto'))) {
                             return switchBtn;
                         }
@@ -1106,34 +1106,34 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 await switchElement.click();
                 console.log('✅ Successfully found and clicked the cutout switch');
                 if (progressCallback) progressCallback('✅ Remove Background switch activated!');
-                
+
                 // Monitor for background removal completion with retry logic
                 console.log('⏳ Monitoring background removal for up to 300 minutes...');
                 if (progressCallback) progressCallback('⏳ Monitoring background removal progress...');
-                
+
                 let retryCount = 0;
                 const maxRetries = 4;
                 let backgroundRemovalComplete = false;
-                
+
                 while (!backgroundRemovalComplete && retryCount <= maxRetries) {
                     try {
                         const result = await page.waitForFunction(() => {
                             // Find the specific background removal switch (not chroma key or other switches)
                             let backgroundRemovalSwitch = null;
-                            
+
                             // Method 1: Find by "Remove backgrounds automatically" text
                             const automaticRemovalElements = Array.from(document.querySelectorAll('div.attribute-switch-field-des1'));
-                            const automaticRemovalDiv = automaticRemovalElements.find(el => 
+                            const automaticRemovalDiv = automaticRemovalElements.find(el =>
                                 el.textContent.includes('Remove backgrounds automatically')
                             );
-                            
+
                             if (automaticRemovalDiv) {
                                 const container = automaticRemovalDiv.closest('.video-tool-item, .cutout-card, .tool-item, .panel-item, .attribute-switch-field');
                                 if (container) {
                                     backgroundRemovalSwitch = container.querySelector('button[role="switch"]');
                                 }
                             }
-                            
+
                             // Method 2: Find by cutout-specific selectors (exclude float-mode-panel and chroma key)
                             if (!backgroundRemovalSwitch) {
                                 const cutoutSelectors = [
@@ -1141,7 +1141,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                     '[data-testid="cutout-switch"] button[role="switch"]',
                                     '[data-testid="auto-cutout-switch"]'
                                 ];
-                                
+
                                 for (const selector of cutoutSelectors) {
                                     const element = document.querySelector(selector);
                                     if (element && element.offsetHeight > 0) {
@@ -1150,7 +1150,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                     }
                                 }
                             }
-                            
+
                             // Method 3: Find by nearby text (exclude float-mode-panel and chroma key)
                             if (!backgroundRemovalSwitch) {
                                 const allSwitches = Array.from(document.querySelectorAll('button[role="switch"]'));
@@ -1158,11 +1158,11 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                     // Skip switches in float-mode-panel-container
                                     const floatModePanel = switchBtn.closest('#float-mode-panel-container');
                                     if (floatModePanel) continue;
-                                    
+
                                     const parent = switchBtn.closest('div');
                                     if (parent) {
                                         const parentText = parent.innerText.toLowerCase();
-                                        if (parentText.includes('remove backgrounds automatically') || 
+                                        if (parentText.includes('remove backgrounds automatically') ||
                                             (parentText.includes('cutout') && parentText.includes('auto'))) {
                                             backgroundRemovalSwitch = switchBtn;
                                             break;
@@ -1170,30 +1170,30 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                     }
                                 }
                             }
-                            
+
                             if (!backgroundRemovalSwitch) {
                                 return false; // Continue waiting if we can't find the specific switch
                             }
-                            
+
                             // Check if the specific background removal switch failed (turned to false)
                             if (backgroundRemovalSwitch.getAttribute('aria-checked') === 'false') {
                                 return 'FAILED'; // Return special value for failed state
                             }
-                            
+
                             // Check for successful completion (switch is true and not loading)
                             if (backgroundRemovalSwitch.getAttribute('aria-checked') === 'true') {
-                                const isLoading = backgroundRemovalSwitch.classList.contains('lv-switch-loading') || 
-                                                backgroundRemovalSwitch.querySelector('.lv-icon-loading');
+                                const isLoading = backgroundRemovalSwitch.classList.contains('lv-switch-loading') ||
+                                    backgroundRemovalSwitch.querySelector('.lv-icon-loading');
                                 if (!isLoading) {
                                     return 'SUCCESS'; // Return special value for success
                                 }
                             }
-                            
+
                             return false; // Continue waiting
                         }, { timeout: 300 * 60 * 1000, polling: 5000 }); // 300 minutes timeout, check every 5 seconds
 
                         const resultValue = await result.jsonValue();
-                        
+
                         if (resultValue === 'SUCCESS') {
                             console.log('✅ Background removal completed successfully!');
                             if (progressCallback) progressCallback('✅ Background removal completed successfully!');
@@ -1202,7 +1202,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                             retryCount++;
                             console.log(`⚠️ Background removal failed (switch turned off). Retry ${retryCount}/${maxRetries}...`);
                             if (progressCallback) progressCallback(`⚠️ Background removal failed. Retry ${retryCount}/${maxRetries}...`);
-                            
+
                             if (retryCount <= maxRetries) {
                                 // Click the switch again to retry
                                 try {
@@ -1231,7 +1231,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                 throw new Error('Background removal failed after maximum retries');
                             }
                         }
-                        
+
                     } catch (monitoringError) {
                         // If this is a background removal failure (not a timeout), re-throw it to fail automation
                         if (monitoringError.message.includes('Background removal failed after maximum retries')) {
@@ -1242,12 +1242,12 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         break;
                     }
                 }
-                
+
                 if (backgroundRemovalComplete) {
                     // Monitor for saving completion by watching loading image disappear
                     console.log('🔍 Monitoring background removal saving completion...');
                     if (progressCallback) progressCallback('🔍 Monitoring saving completion...');
-                    
+
                     try {
                         // Check if loading image appears during saving (same selectors as video loading monitor)
                         const savingLoadingSelectors = [
@@ -1255,10 +1255,10 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                             'img[alt="loading"]',
                             'xpath///*[@id="workbench-editor-container"]/div[1]/div[1]/div/div/div/div/div/img'
                         ];
-                        
+
                         let savingLoadingFound = false;
                         let savingLoadingElement = null;
-                        
+
                         // Check for loading image with short timeout
                         for (const selector of savingLoadingSelectors) {
                             try {
@@ -1278,40 +1278,40 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                 // Loading image not found with this selector, try next
                             }
                         }
-                        
+
                         if (savingLoadingFound && savingLoadingElement) {
                             // Wait for loading image to disappear OR cloud save completion icon to appear (up to 1 minute)
                             console.log('⏳ Waiting for saving loading to complete (up to 1 minute)...');
-                            
+
                             const savingCompleted = await page.waitForFunction(
                                 (element) => {
                                     // Check if loading image disappeared
                                     const loadingDisappeared = !element || element.offsetHeight === 0 || element.style.display === 'none' || !document.contains(element);
-                                    
+
                                     // Check if cloud save animation has stopped (more precise detection)
                                     const cloudSaveContainer = document.querySelector('#cloud-draft-async');
                                     if (cloudSaveContainer && cloudSaveContainer.offsetHeight > 0) {
                                         // Check if the uploading animation arrow is still present/active
                                         const animationArrow = cloudSaveContainer.querySelector('.uploading-animation-arrow');
                                         const isAnimating = animationArrow && animationArrow.offsetHeight > 0;
-                                        
+
                                         // Only consider cloud save completed if animation has stopped
                                         const cloudSaveCompleted = !isAnimating;
                                         return loadingDisappeared || cloudSaveCompleted;
                                     }
-                                    
+
                                     // Fallback: if no cloud save container, rely on loading image disappearance
                                     return loadingDisappeared;
                                 },
                                 { timeout: 1 * 60 * 1000, polling: 2000 }, // 1 minute timeout, check every 2 seconds
                                 savingLoadingElement
                             );
-                            
+
                             // Check which condition was met - animation stopped or loading disappeared
                             const cloudSaveContainer = await page.$('#cloud-draft-async');
                             const animationArrow = cloudSaveContainer ? await cloudSaveContainer.$('.uploading-animation-arrow') : null;
                             const isStillAnimating = animationArrow && await animationArrow.evaluate(el => el.offsetHeight > 0);
-                            
+
                             if (cloudSaveContainer && !isStillAnimating) {
                                 console.log('✅ Background removal saving completed successfully! (Cloud save animation stopped)');
                                 if (progressCallback) progressCallback('✅ Background removal saving completed! (Animation stopped)');
@@ -1335,32 +1335,32 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                 if (progressCallback) progressCallback('✅ Background removal saved immediately');
                             }
                         }
-                        
+
                     } catch (savingError) {
                         console.log('⚠️ Saving monitor timeout or error:', savingError.message);
                         if (progressCallback) progressCallback('⚠️ Saving monitor timeout - assuming saved');
                         // Continue anyway - assume saving completed
                     }
-                    
+
                     // Final step: Wait 25 seconds and show success message with video name
                     console.log('⏳ Waiting 25 seconds for final processing...');
                     if (progressCallback) progressCallback('⏳ Final processing (25 seconds)...');
                     await page.waitForTimeout(25000); // 25 seconds = 25,000ms
-                    
+
                     // Get the video name from the uploaded file
                     const videoName = path.basename(videoPath, path.extname(videoPath));
                     console.log(`🎉 SUCCESS! Video background removed successfully: "${videoName}"`);
                     if (progressCallback) progressCallback(`🎉 SUCCESS! Background removed: "${videoName}"`);
-                    
+
                     // Log successful completion to Google Sheets
                     try {
                         console.log('📊 Logging successful completion to Google Sheets...');
                         if (progressCallback) progressCallback('📊 Logging to Google Sheets...');
-                        
+
                         // Get video metadata from videos.json
                         let videoDescription = '';
                         try {
-                            const videosJsonPath = path.join(__dirname, 'videos.json');
+                            const videosJsonPath = path.join(__dirname, '../data/videos.json');
                             if (fs.existsSync(videosJsonPath)) {
                                 const videosData = JSON.parse(fs.readFileSync(videosJsonPath, 'utf8'));
                                 const videoEntry = videosData.videos.find(v => v.filename === path.basename(videoPath));
@@ -1371,26 +1371,26 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         } catch (metadataError) {
                             console.log('⚠️ Could not retrieve video metadata for Google Sheets:', metadataError.message);
                         }
-                        
+
                         // Clean the original URL (remove any timestamp prefixes if present)
                         let cleanUrl = originalUrl || 'Unknown URL';
                         if (cleanUrl.includes(' - ')) {
                             // Remove timestamp prefix if present (format: "2025-08-15T04:36:29.736Z - URL")
                             cleanUrl = cleanUrl.split(' - ').pop().trim();
                         }
-                        
+
                         const sheetsData = {
                             title: videoName,
                             description: videoDescription,
                             editorUrl: editorUrl,
                             originalUrl: cleanUrl
                         };
-                        
+
                         const sheetsResult = await googleSheets.logVideoCompletion(sheetsData);
                         if (sheetsResult.success) {
                             console.log('✅ Successfully logged to Google Sheets');
                             if (progressCallback) progressCallback('✅ Logged to Google Sheets');
-                            
+
                             // Clean up .info.json file after successful Google Sheets logging
                             try {
                                 const infoJsonPath = videoPath.replace(/\.(mp4|mkv|avi|mov|wmv|flv|webm)$/i, '.info.json');
@@ -1407,12 +1407,12 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         } else {
                             console.log('⚠️ Google Sheets logging failed:', sheetsResult.error || sheetsResult.reason);
                         }
-                        
+
                     } catch (sheetsError) {
                         console.log('⚠️ Google Sheets logging error:', sheetsError.message);
                         // Don't fail the automation for Google Sheets errors
                     }
-                    
+
                     // Final cleanup: Delete the original video file from uploads folder
                     try {
                         if (fs.existsSync(videoPath)) {
@@ -1427,13 +1427,13 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         if (progressCallback) progressCallback(`⚠️ Cleanup warning: Could not delete original file`);
                     }
                 }
-                
+
             } else {
                 console.log('⚠️ Could not find the cutout switch');
                 if (progressCallback) progressCallback('⚠️ Could not find Remove Background switch');
                 throw new Error('Could not find Remove Background switch - automation failed');
             }
-            
+
         } catch (removeBackgroundError) {
             console.log('⚠️ Remove background error:', removeBackgroundError.message);
             if (progressCallback) progressCallback('⚠️ Remove background failed');
@@ -1442,7 +1442,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 
         // Update editor result to "complete" on success
         try {
-            const editorsPath = path.join(__dirname, 'editors.json');
+            const editorsPath = path.join(__dirname, '../config/editors.json');
             if (fs.existsSync(editorsPath)) {
                 const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
                 const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
@@ -1474,10 +1474,10 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             console.log('🚪 Browser tab closed unexpectedly');
             if (progressCallback) progressCallback('🚪 Browser tab closed unexpectedly');
         }
-        
+
         // Update editor result to "error" on failure
         try {
-            const editorsPath = path.join(__dirname, 'editors.json');
+            const editorsPath = path.join(__dirname, '../config/editors.json');
             if (fs.existsSync(editorsPath)) {
                 const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
                 const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
@@ -1491,7 +1491,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         } catch (updateError) {
             console.log('⚠️ Could not update editor result status');
         }
-        
+
         // Delete failed video from uploads folder for cleanup
         try {
             if (videoPath && fs.existsSync(videoPath)) {
@@ -1502,7 +1502,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         } catch (deleteError) {
             console.log('⚠️ Could not delete failed video file:', deleteError.message);
         }
-        
+
         // Delete corresponding .info.json file for cleanup
         try {
             if (videoPath) {
@@ -1518,17 +1518,17 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         } catch (infoDeleteError) {
             console.log('⚠️ Could not delete failed info file:', infoDeleteError.message);
         }
-        
+
         // Don't log here - error already shown above, just re-throw
         throw error;
     } finally {
         // Remove this tab from switching rotation
         const editorId = editorUrl ? editorUrl.split('/editor/')[1]?.split('?')[0] : 'unknown';
         removeEditorTab(editorId);
-        
+
         // Keep editor status as "in-use" - do not reset to available
         console.log('📝 Editor remains "in-use" for future automations');
-        
+
         // Robust tab/context cleanup for RDP environments
         if (page) {
             try {
@@ -1546,7 +1546,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 } catch (evalError) {
                     console.log('⚠️ Context cleanup evaluation failed (expected on destroyed context)');
                 }
-                
+
                 // Close the page/tab
                 await page.close();
                 console.log('📄 Tab closed with context cleanup, browser instance kept running for reuse');
@@ -1560,7 +1560,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 }
             }
         }
-        
+
         // Keep browser instance running for future automations
         if (browser) {
             console.log('🌐 Browser instance kept running for future automations');

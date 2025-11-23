@@ -7,22 +7,22 @@ class GoogleSheetsService {
     constructor() {
         // Web App method configuration
         this.webAppUrl = process.env.GOOGLE_SHEETS_URL;
-        
+
         // Service Account method configuration
         this.serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || 'capcut-auto@capcut-auto.iam.gserviceaccount.com';
-        this.privateKeyPath = process.env.GOOGLE_PRIVATE_KEY_PATH || path.join(__dirname, 'google-service-account-key.json');
+        this.privateKeyPath = process.env.GOOGLE_PRIVATE_KEY_PATH || path.join(__dirname, '../config/capcut-sheet-service-account.json');
         this.spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || '';
         this.sheetName = process.env.GOOGLE_SHEET_NAME || 'Video Completions';
-        
+
         // Service Account tokens
         this.accessToken = null;
         this.tokenExpiry = null;
-        
+
         // Determine which method to use
         this.useServiceAccount = this.checkServiceAccountConfig();
         this.useWebApp = !this.useServiceAccount && !!this.webAppUrl;
         this.enabled = this.useServiceAccount || this.useWebApp;
-        
+
         this.logConfiguration();
     }
 
@@ -33,11 +33,11 @@ class GoogleSheetsService {
         if (!this.spreadsheetId) {
             return false;
         }
-        
+
         if (!fs.existsSync(this.privateKeyPath)) {
             return false;
         }
-        
+
         try {
             const keyData = JSON.parse(fs.readFileSync(this.privateKeyPath, 'utf8'));
             return !!(keyData.private_key && keyData.client_email);
@@ -79,7 +79,7 @@ class GoogleSheetsService {
 
         try {
             console.log(`📊 Logging video completion to Google Sheets: "${videoData.title}"`);
-            
+
             if (this.useServiceAccount) {
                 return await this.logWithServiceAccount(videoData);
             } else if (this.useWebApp) {
@@ -98,7 +98,7 @@ class GoogleSheetsService {
     async logWithServiceAccount(videoData) {
         try {
             const accessToken = await this.getAccessToken();
-            
+
             // Prepare row data (no timestamps)
             const rowData = [
                 videoData.title || 'Unknown Title',
@@ -109,7 +109,7 @@ class GoogleSheetsService {
             ];
 
             const result = await this.appendRowToSheet(accessToken, rowData);
-            
+
             if (result.success) {
                 console.log('✅ Video completion logged to Google Sheets successfully (Service Account)');
                 return { success: true, data: result.data };
@@ -139,7 +139,7 @@ class GoogleSheetsService {
             });
 
             const result = await this.makeHttpRequest(postData);
-            
+
             if (result.success) {
                 console.log('✅ Video completion logged to Google Sheets successfully (Web App)');
                 return { success: true, data: result.data };
@@ -160,7 +160,7 @@ class GoogleSheetsService {
     makeRequest(postData) {
         return new Promise((resolve, reject) => {
             const url = new URL(this.webAppUrl);
-            
+
             const options = {
                 hostname: url.hostname,
                 path: url.pathname + url.search,
@@ -174,11 +174,11 @@ class GoogleSheetsService {
 
             const req = https.request(options, (res) => {
                 let data = '';
-                
+
                 res.on('data', (chunk) => {
                     data += chunk;
                 });
-                
+
                 res.on('end', () => {
                     try {
                         const response = JSON.parse(data);
@@ -219,13 +219,13 @@ class GoogleSheetsService {
         try {
             const keyData = JSON.parse(fs.readFileSync(this.privateKeyPath, 'utf8'));
             const jwt = this.createJWT(keyData);
-            
+
             const tokenData = await this.requestAccessToken(jwt);
             this.accessToken = tokenData.access_token;
             this.tokenExpiry = Date.now() + (tokenData.expires_in * 1000) - 60000; // 1 minute buffer
-            
+
             return this.accessToken;
-            
+
         } catch (error) {
             console.error('❌ Error getting access token:', error.message);
             throw error;
@@ -237,12 +237,12 @@ class GoogleSheetsService {
      */
     createJWT(keyData) {
         const crypto = require('crypto');
-        
+
         const header = {
             alg: 'RS256',
             typ: 'JWT'
         };
-        
+
         const now = Math.floor(Date.now() / 1000);
         const payload = {
             iss: keyData.client_email,
@@ -251,14 +251,14 @@ class GoogleSheetsService {
             exp: now + 3600,
             iat: now
         };
-        
+
         const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
         const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
-        
+
         const signatureInput = `${encodedHeader}.${encodedPayload}`;
         const signature = crypto.sign('RSA-SHA256', Buffer.from(signatureInput), keyData.private_key);
         const encodedSignature = signature.toString('base64url');
-        
+
         return `${signatureInput}.${encodedSignature}`;
     }
 
@@ -268,7 +268,7 @@ class GoogleSheetsService {
     requestAccessToken(jwt) {
         return new Promise((resolve, reject) => {
             const postData = `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`;
-            
+
             const options = {
                 hostname: 'oauth2.googleapis.com',
                 path: '/token',
@@ -312,7 +312,7 @@ class GoogleSheetsService {
             };
 
             const postData = JSON.stringify(requestBody);
-            
+
             const options = {
                 hostname: 'sheets.googleapis.com',
                 path: `/v4/spreadsheets/${this.spreadsheetId}/values/A1:E:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,

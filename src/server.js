@@ -14,7 +14,7 @@ const batchProcessor = new BatchProcessor();
 // Function to count currently running automations
 function getRunningAutomationsCount() {
     try {
-        const editorsFile = path.join(__dirname, 'editors.json');
+        const editorsFile = path.join(__dirname, '../config/editors.json');
         if (!fs.existsSync(editorsFile)) {
             return 0;
         }
@@ -32,12 +32,12 @@ function getRunningAutomationsCount() {
 // Auto-start batch processor on server startup (if enabled in .env)
 setTimeout(() => {
     const batchProcessorEnabled = process.env['batch-processor'] === 'true';
-    
+
     if (!batchProcessorEnabled) {
         console.log('📴 Batch processor disabled in .env - skipping auto-start');
         return;
     }
-    
+
     console.log('🔍 Batch processor enabled - checking for videos in queue...');
     const urls = batchProcessor.readQueueFile();
     if (urls.length > 0) {
@@ -51,7 +51,7 @@ setTimeout(() => {
 }, 5000); // Wait 5 seconds after server start
 
 // Watch "new videos" file for changes and auto-start batch processor (if enabled)
-const newVideosFile = path.join(__dirname, 'new videos');
+const newVideosFile = path.join(__dirname, '../data/new videos');
 const batchProcessorEnabled = process.env['batch-processor'] === 'true';
 
 if (batchProcessorEnabled && fs.existsSync(newVideosFile)) {
@@ -77,7 +77,7 @@ if (batchProcessorEnabled && fs.existsSync(newVideosFile)) {
 // Configure multer for local file uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'uploads/') // Files will be saved in the 'uploads' directory
+        cb(null, path.join(__dirname, '../uploads/')) // Files will be saved in the 'uploads' directory
     },
     filename: function (req, file, cb) {
         // Create a unique filename to avoid overwriting
@@ -91,7 +91,7 @@ const app = express();
 const port = 3000;
 
 // --- Middleware ---
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, '../public')));
 app.use(express.json());
 
 // --- API Routes ---
@@ -107,11 +107,11 @@ app.post('/upload', upload.single('video'), async (req, res) => {
 
     try {
         console.log('📼 Starting CapCut automation for local upload...');
-        
+
         // Check concurrent automation limit (maximum 3 with shared browser)
         const maxConcurrent = 3;
         const runningCount = getRunningAutomationsCount();
-        
+
         if (runningCount >= maxConcurrent) {
             console.log(`❌ Concurrent automation limit reached (${runningCount}/${maxConcurrent})`);
             broadcastProgress(`❌ Limit reached - please wait`);
@@ -122,17 +122,17 @@ app.post('/upload', upload.single('video'), async (req, res) => {
                 maxConcurrent: maxConcurrent
             });
         }
-        
+
         console.log(`🚀 Starting automation (${runningCount + 1}/${maxConcurrent} slots used)`);
-        
+
         // Start CapCut automation with the uploaded file
         await runSimpleUpload(absoluteFilePath, (message) => {
-            console.log('📤 Upload Progress:', message);
+            console.log('🔄 Automation Progress:', message);
             broadcastProgress(message);
         }, 'Local File Upload');
-        
+
         console.log('🎉 CapCut automation completed successfully for local upload!');
-        
+
         res.json({
             success: true,
             message: 'File uploaded and CapCut automation completed successfully!',
@@ -150,7 +150,7 @@ app.post('/upload', upload.single('video'), async (req, res) => {
 
 // Serve videos.json file
 app.get('/videos.json', (req, res) => {
-    const videosJsonPath = path.join(__dirname, 'videos.json');
+    const videosJsonPath = path.join(__dirname, '../data/videos.json');
     if (fs.existsSync(videosJsonPath)) {
         res.sendFile(videosJsonPath);
     } else {
@@ -167,9 +167,9 @@ app.get('/progress', (req, res) => {
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*'
     });
-    
+
     progressClients.add(res);
-    
+
     req.on('close', () => {
         progressClients.delete(res);
     });
@@ -207,17 +207,17 @@ app.post('/simple-upload', async (req, res) => {
 
 // Serve the videos page
 app.get('/videos', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'videos.html'));
+    res.sendFile(path.join(__dirname, '../public', 'videos.html'));
 });
 
 // --- Page for updating cookies ---
 app.get('/go', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'go.html'));
+    res.sendFile(path.join(__dirname, '../public', 'go.html'));
 });
 
 // --- API for getting and setting cookies ---
 app.get('/api/cookies', (req, res) => {
-    const cookiesPath = path.join(__dirname, 'youtube-cookies.txt');
+    const cookiesPath = path.join(__dirname, '../config/youtube-cookies.txt');
     if (fs.existsSync(cookiesPath)) {
         // Set content type to plain text to avoid browser rendering issues
         res.type('text/plain');
@@ -234,7 +234,7 @@ app.post('/api/cookies', (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid cookie data.' });
     }
 
-    const cookiesPath = path.join(__dirname, 'youtube-cookies.txt');
+    const cookiesPath = path.join(__dirname, '../config/youtube-cookies.txt');
     fs.writeFile(cookiesPath, cookies, (err) => {
         if (err) {
             console.error('Error saving cookies:', err);
@@ -247,7 +247,7 @@ app.post('/api/cookies', (req, res) => {
 
 app.post('/api/editors', (req, res) => {
     let editors = req.body.editors || req.body;
-    
+
     // Handle case where editors data might be double-encoded as string
     if (typeof editors === 'string') {
         try {
@@ -257,12 +257,12 @@ app.post('/api/editors', (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid JSON format in editors data.' });
         }
     }
-    
+
     if (!editors) {
         return res.status(400).json({ success: false, message: 'Invalid editors data.' });
     }
 
-    const editorsPath = path.join(__dirname, 'editors.json');
+    const editorsPath = path.join(__dirname, '../config/editors.json');
     // Pretty print the JSON with an indent of 2 spaces
     const editorsString = JSON.stringify(editors, null, 2);
 
@@ -277,7 +277,7 @@ app.post('/api/editors', (req, res) => {
 });
 
 app.get('/api/editors', (req, res) => {
-    const editorsPath = path.join(__dirname, 'editors.json');
+    const editorsPath = path.join(__dirname, '../config/editors.json');
     if (fs.existsSync(editorsPath)) {
         res.sendFile(editorsPath);
     } else {
@@ -287,7 +287,7 @@ app.get('/api/editors', (req, res) => {
 
 // --- API for getting and setting new videos queue ---
 app.get('/api/new-videos', (req, res) => {
-    const newVideosPath = path.join(__dirname, 'new videos');
+    const newVideosPath = path.join(__dirname, '../data/new videos');
     if (fs.existsSync(newVideosPath)) {
         res.type('text/plain');
         res.sendFile(newVideosPath);
@@ -302,7 +302,7 @@ app.post('/api/new-videos', (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid data for new videos file.' });
     }
 
-    const newVideosPath = path.join(__dirname, 'new videos');
+    const newVideosPath = path.join(__dirname, '../data/new videos');
     fs.writeFile(newVideosPath, videos, (err) => {
         if (err) {
             console.error('Error saving new videos file:', err);
@@ -315,7 +315,7 @@ app.post('/api/new-videos', (req, res) => {
 
 // CapCut cookies routes
 app.get('/api/capcut-cookies', (req, res) => {
-    const capcutCookiesPath = path.join(__dirname, 'cookies.json');
+    const capcutCookiesPath = path.join(__dirname, '../config/cookies.json');
     if (fs.existsSync(capcutCookiesPath)) {
         res.type('application/json');
         res.sendFile(capcutCookiesPath);
@@ -326,11 +326,11 @@ app.get('/api/capcut-cookies', (req, res) => {
 
 app.post('/api/capcut-cookies', (req, res) => {
     const { cookies } = req.body;
-    
+
     // Handle both string and object data from frontend
     let cookiesData;
     let cookiesString;
-    
+
     if (typeof cookies === 'string') {
         // If it's already a string, parse it to validate
         try {
@@ -352,7 +352,7 @@ app.post('/api/capcut-cookies', (req, res) => {
         return res.status(400).json({ success: false, message: 'CapCut cookies must be a JSON array.' });
     }
 
-    const capcutCookiesPath = path.join(__dirname, 'cookies.json');
+    const capcutCookiesPath = path.join(__dirname, '../config/cookies.json');
     fs.writeFile(capcutCookiesPath, cookiesString, (err) => {
         if (err) {
             console.error('Error saving CapCut cookies file:', err);
@@ -365,7 +365,7 @@ app.post('/api/capcut-cookies', (req, res) => {
 
 // Google Sheets service account routes
 app.get('/api/service-account', (req, res) => {
-    const serviceAccountPath = path.join(__dirname, 'capcut-sheet-service-account.json');
+    const serviceAccountPath = path.join(__dirname, '../config/capcut-sheet-service-account.json');
     if (fs.existsSync(serviceAccountPath)) {
         res.type('application/json');
         res.sendFile(serviceAccountPath);
@@ -387,7 +387,7 @@ app.post('/api/service-account', (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid JSON format for service account.' });
     }
 
-    const serviceAccountPath = path.join(__dirname, 'capcut-sheet-service-account.json');
+    const serviceAccountPath = path.join(__dirname, '../config/capcut-sheet-service-account.json');
     fs.writeFile(serviceAccountPath, serviceAccount, (err) => {
         if (err) {
             console.error('Error saving service account file:', err);
@@ -408,17 +408,17 @@ app.post('/youtube/info', async (req, res) => {
 
         broadcastProgress('🔍 Getting video information...');
         const videoInfo = await getVideoInfo(url);
-        
-        res.json({ 
-            success: true, 
-            ...videoInfo 
+
+        res.json({
+            success: true,
+            ...videoInfo
         });
     } catch (error) {
         console.error('Error getting video info:', error);
         broadcastProgress(`❌ Error: ${error.message}`);
-        res.status(500).json({ 
-            success: false, 
-            message: error.message 
+        res.status(500).json({
+            success: false,
+            message: error.message
         });
     }
 });
@@ -431,19 +431,19 @@ app.post('/youtube/download', async (req, res) => {
         }
 
         // Check editor availability BEFORE downloading to prevent waste
-        const editorsPath = path.join(__dirname, 'editors.json');
+        const editorsPath = path.join(__dirname, '../config/editors.json');
         if (!fs.existsSync(editorsPath)) {
             throw new Error('editors.json not found - cannot check editor availability');
         }
         const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
         // Handle both old array structure and new object structure
         const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
-        
+
         // Use same logic as batch processor: check both status AND result
-        const availableEditor = editors.find(editor => 
+        const availableEditor = editors.find(editor =>
             editor.status === 'available' && editor.result !== 'running'
         );
-        
+
         if (!availableEditor) {
             console.log('❌ All editors are busy - download blocked');
             broadcastProgress('❌ All editors are busy - download blocked');
@@ -459,34 +459,34 @@ app.post('/youtube/download', async (req, res) => {
         broadcastProgress('📤 Starting CapCut automation pipeline...');
         console.log('🔍 DEBUG: Downloaded file path:', downloadedPath);
         console.log('🔍 DEBUG: File exists:', fs.existsSync(downloadedPath));
-        
+
         // Editor availability already checked above - proceed with automation
-        
+
         // Import and run the automation
         console.log('🚀 DEBUG: About to call runSimpleUpload...');
         const { runSimpleUpload } = require('./timeline_test');
         await runSimpleUpload(downloadedPath, (message) => {
-            console.log('📤 Upload Progress:', message);
+            console.log('🔄 Automation Progress:', message);
         }, url);
-        
-        res.json({ 
-            success: true, 
+
+        res.json({
+            success: true,
             message: 'Video downloaded and automation started',
             filePath: downloadedPath
         });
     } catch (error) {
         console.error('Error downloading video:', error);
         broadcastProgress(`❌ Download failed: ${error.message}`);
-        res.status(500).json({ 
-            success: false, 
-            message: error.message 
+        res.status(500).json({
+            success: false,
+            message: error.message
         });
     }
 });
 
 // Status check now checks the filesystem for the puppeteer_data directory.
 app.get('/status', (req, res) => {
-    const puppeteerDataPath = path.join(__dirname, 'puppeteer_data');
+    const puppeteerDataPath = path.join(__dirname, '../puppeteer_data');
     const isLoggedIn = fs.existsSync(puppeteerDataPath);
     console.log(`Checking for login status via filesystem. Path: '${puppeteerDataPath}'. Found: ${isLoggedIn}`);
     res.json({ loggedIn: isLoggedIn });
@@ -505,21 +505,21 @@ app.post('/login', async (req, res) => {
 app.post('/batch/start', async (req, res) => {
     try {
         console.log('🚀 Starting batch processor...');
-        
+
         // Start batch processing (non-blocking)
         batchProcessor.processQueue().catch(error => {
             console.error('❌ Batch processor error:', error);
         });
-        
-        res.json({ 
-            success: true, 
-            message: 'Batch processor started - processing videos from "new videos" file' 
+
+        res.json({
+            success: true,
+            message: 'Batch processor started - processing videos from "new videos" file'
         });
     } catch (error) {
         console.error('❌ Failed to start batch processor:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: `Failed to start batch processor: ${error.message}` 
+        res.status(500).json({
+            success: false,
+            message: `Failed to start batch processor: ${error.message}`
         });
     }
 });
@@ -533,9 +533,9 @@ app.get('/batch/status', (req, res) => {
         });
     } catch (error) {
         console.error('❌ Failed to get batch processor status:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: `Failed to get status: ${error.message}` 
+        res.status(500).json({
+            success: false,
+            message: `Failed to get status: ${error.message}`
         });
     }
 });
@@ -556,24 +556,33 @@ const server = app.listen(port, '0.0.0.0', () => {
     console.log(`📱 Management page: http://localhost:${port}/go`);
     console.log('🔗 Server is now accessible from any IP address!');
     console.log('Open your browser and navigate to the URL to start.');
-    
+
     // Clean all video files and temp files on restart
     try {
         // Clean uploads folder
-        const uploadFiles = fs.readdirSync('uploads');
-        uploadFiles.forEach(file => {
-            if (file.endsWith('.mp4') || file.endsWith('.info.json')) {
-                fs.unlinkSync(`uploads/${file}`);
-            }
-        });
+        const uploadsDir = path.join(__dirname, '../uploads');
+        if (fs.existsSync(uploadsDir)) {
+            const uploadFiles = fs.readdirSync(uploadsDir);
+            uploadFiles.forEach(file => {
+                if (file.endsWith('.mp4') || file.endsWith('.info.json')) {
+                    fs.unlinkSync(path.join(uploadsDir, file));
+                }
+            });
+        }
+
         // Clean temp folder
-        const tempFiles = fs.readdirSync('temp');
-        tempFiles.forEach(file => {
-            if (file.endsWith('.tmp')) {
-                fs.unlinkSync(`temp/${file}`);
-            }
-        });
-    } catch(e) {}
+        const tempDir = path.join(__dirname, '../temp');
+        if (fs.existsSync(tempDir)) {
+            const tempFiles = fs.readdirSync(tempDir);
+            tempFiles.forEach(file => {
+                if (file.endsWith('.tmp')) {
+                    fs.unlinkSync(path.join(tempDir, file));
+                }
+            });
+        }
+    } catch (e) {
+        console.error('Cleanup error:', e.message);
+    }
 });
 
 // --- Graceful Shutdown ---

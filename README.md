@@ -5,7 +5,9 @@ A comprehensive automation system for CapCut video processing with YouTube integ
 ## Installation
 
 download folder    https://github.com/mustapharajaa/capu
-```cmd
+
+download chrome and yt dlp 
+
 in terminal not shell RUN THIS COMMANDS 
 
 .\setup.bat
@@ -13,6 +15,9 @@ npm cache clean --force
 npm install
 node setup.js 
                       if any package error  run rmdir /s /q node_modules
+
+                  1 set PUPPETEER_EXECUTABLE_PATH=
+                 2 set PUPPETEER_EXECUTABLE_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe
                       
 1, edit .env details                                       
 
@@ -23,7 +28,7 @@ FFMPEG_PATH= #FFMPEG_PATH will use npm package fallback - comment out or remove 
     ^in localhost:3000/go or rdpip/go^
 3, editors.json & new videos & youtube-cookies.txt & google sheet  key & capcut cookies.json
 
-
+4,npm run start
 ```
 
 ⚠️ youtube cookies ⚠️

@@ -2,12 +2,12 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const router = express.Router();
-const { runAutomationPipeline } = require('./timeline_test'); // Import the timeline automation
+const { runAutomationPipeline } = require('../src/timeline_test'); // Import the timeline automation
 
 // Configure storage for multer
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'uploads/') // Files will be saved in the 'uploads' directory
+        cb(null, path.join(__dirname, '../uploads/')) // Files will be saved in the 'uploads' directory
     },
     filename: function (req, file, cb) {
         // Create a unique filename to avoid overwriting

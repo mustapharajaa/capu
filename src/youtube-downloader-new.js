@@ -5,7 +5,7 @@ require('dotenv').config();
 const YtDlpWrap = require('yt-dlp-wrap').default;
 const ffmpeg = require('@ffmpeg-installer/ffmpeg');
 
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
+const UPLOADS_DIR = path.join(__dirname, '../uploads');
 // Get the yt-dlp binary path from environment variables
 const YTDLP_BINARY_PATH = process.env.YTDLP_PATH;
 if (!YTDLP_BINARY_PATH || !fs.existsSync(YTDLP_BINARY_PATH)) {
@@ -47,12 +47,12 @@ async function downloadYouTubeVideo(url, progressCallback) {
     return new Promise(async (resolve, reject) => {
         try {
             const timestamp = Date.now();
-            const cookiesPath = path.join(__dirname, 'youtube-cookies.txt');
+            const cookiesPath = path.join(__dirname, '../config/youtube-cookies.txt');
 
             // Get video metadata first to get the title for the filename
             console.log('Fetching video metadata...');
             let metadata;
-            
+
             // Use spawn to get metadata with cookies (like reference app)
             if (fs.existsSync(cookiesPath)) {
                 console.log('🍪 Using YouTube cookies for authentication');
@@ -62,7 +62,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
                     url
                 ];
                 console.log(`Executing: ${YTDLP_BINARY_PATH} ${metadataArgs.join(' ')}`);
-                
+
                 const { execSync } = require('child_process');
                 const metadataOutput = execSync(`"${YTDLP_BINARY_PATH}" --dump-json --cookies "${cookiesPath}" "${url}"`, { encoding: 'utf8' });
                 metadata = JSON.parse(metadataOutput);
@@ -76,13 +76,13 @@ async function downloadYouTubeVideo(url, progressCallback) {
             let outputFilename = `${sanitizedTitle}.mp4`;
             let baseFilename = sanitizedTitle;
             let counter = 1;
-            
+
             // Keep checking until we find a unique filename
             while (fs.existsSync(path.join(UPLOADS_DIR, outputFilename))) {
                 outputFilename = `${baseFilename} (${counter}).mp4`;
                 counter++;
             }
-            
+
             const outputPath = path.join(UPLOADS_DIR, outputFilename);
             const infoJsonName = outputFilename.replace('.mp4', '.info.json');
             const infoJsonPath = path.join(UPLOADS_DIR, infoJsonName);
@@ -90,7 +90,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
             // Save the metadata we already fetched to the .info.json file
             fs.writeFileSync(infoJsonPath, JSON.stringify(metadata, null, 2));
             console.log(`Saved .info.json to ${infoJsonPath}`);
-            
+
             // Extract resolution info from metadata for display
             const height = metadata.height || 'Unknown';
             const width = metadata.width || 'Unknown';
@@ -105,22 +105,22 @@ async function downloadYouTubeVideo(url, progressCallback) {
             console.log(`⏱️ Video Duration: ${durationMinutes} minutes`);
 
             let formatArgs = ['bestvideo+bestaudio/best'];
-            
+
             if (duration > 3600) { // Over 1 hour (3600 seconds)
                 // Generate random duration between 37-49 minutes
                 const minDuration = 49 * 60; // 37 minutes in seconds
                 const maxDuration = 63 * 60; // 49 minutes in seconds
                 const randomDuration = Math.floor(Math.random() * (maxDuration - minDuration + 1)) + minDuration;
                 const randomMinutes = Math.floor(randomDuration / 60);
-                
+
                 // Random start time (ensure we don't exceed video length)
                 const maxStartTime = duration - randomDuration;
                 const startTime = Math.floor(Math.random() * maxStartTime);
                 const endTime = startTime + randomDuration;
-                
+
                 console.log(`✂️ Long video detected (${durationMinutes}min) - trimming to ${randomMinutes}min`);
-                console.log(`📍 Trim: ${Math.floor(startTime/60)}:${String(startTime%60).padStart(2,'0')} - ${Math.floor(endTime/60)}:${String(endTime%60).padStart(2,'0')}`);
-                
+                console.log(`📍 Trim: ${Math.floor(startTime / 60)}:${String(startTime % 60).padStart(2, '0')} - ${Math.floor(endTime / 60)}:${String(endTime % 60).padStart(2, '0')}`);
+
                 formatArgs = [
                     'bestvideo+bestaudio/best',
                     '--postprocessor-args', `ffmpeg:-ss ${startTime} -t ${randomDuration} -avoid_negative_ts make_zero -map 0:v:0? -map 0:a:0? -c:v copy -c:a aac`
@@ -147,33 +147,33 @@ async function downloadYouTubeVideo(url, progressCallback) {
                 // Fast processing - no re-encoding
                 ytdlpArgs.push('--postprocessor-args', 'ffmpeg:-c:v copy -c:a aac -strict -2');
             }
-            
+
             // Add cookies if file exists (EXACTLY like reference app)
             if (fs.existsSync(cookiesPath)) {
                 ytdlpArgs.push('--cookies', cookiesPath);
             } else {
                 console.log('⚠️ No cookies file found - downloads may be limited by bot detection');
             }
-            
+
             ytdlpArgs.push('--no-continue', url);
 
             console.log(`🔧 FFmpeg Path: ${FFMPEG_PATH}`);
             console.log(`Executing: ${YTDLP_BINARY_PATH} ${ytdlpArgs.join(' ')}`);
-            
+
             // Format checking removed for cleaner output
-            
+
             if (progressCallback) progressCallback({ message: 'Starting download...' });
 
             // Suppress ytdlp console output
             const originalWrite = process.stdout.write;
             const originalLog = console.log;
             let progressLine = '';
-            
+
             // Override console methods to filter ytdlp output but allow format info
-            process.stdout.write = function(chunk, ...args) {
+            process.stdout.write = function (chunk, ...args) {
                 const str = chunk.toString();
                 // Allow our progress line, format info, and important messages
-                if (str.startsWith('\r📥 Downloading:') || 
+                if (str.startsWith('\r📥 Downloading:') ||
                     !str.includes('Download Progress:') ||
                     str.includes('[info]') ||
                     str.includes('[Merger]') ||
@@ -182,11 +182,11 @@ async function downloadYouTubeVideo(url, progressCallback) {
                 }
                 return true;
             };
-            
-            console.log = function(...args) {
+
+            console.log = function (...args) {
                 const str = args.join(' ');
                 // Allow format info, merger info, and important logs
-                if (!str.includes('Download Progress:') || 
+                if (!str.includes('Download Progress:') ||
                     str.includes('[info]') ||
                     str.includes('[Merger]') ||
                     str.includes('format') ||
@@ -201,10 +201,10 @@ async function downloadYouTubeVideo(url, progressCallback) {
                     const percent = progress.percent ? progress.percent.toFixed(1) : 0;
                     const speed = progress.currentSpeed || 'N/A';
                     const message = `📥 Downloading: ${percent}% | ${speed}`;
-                    
+
                     // Single line progress like npm
                     process.stdout.write(`\r${message.padEnd(50)}`);
-                    
+
                     if (progressCallback) progressCallback({ message: `Downloading... ${percent}% at ${speed}`, progress: percent });
                 })
                 .on('ytDlpEvent', (eventType, eventData) => {
@@ -219,18 +219,18 @@ async function downloadYouTubeVideo(url, progressCallback) {
                             console.log(`📋 ${eventData}`);
                         }
                     }
-                    
+
                     if (eventType === 'Merger' || eventData.includes('Merging formats')) {
                         console.log(`🔧 FFmpeg: ${eventData}`);
                     }
-                    
+
                     if (progressCallback) progressCallback({ message: `[${eventType}] ${eventData}` });
                 })
                 .on('error', (error) => {
                     // Restore original console methods on error
                     process.stdout.write = originalWrite;
                     console.log = originalLog;
-                    
+
                     console.error('Error during download:', error);
                     if (progressCallback) progressCallback({ message: `Error: ${error.message}` });
                     reject(error);
@@ -239,7 +239,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
                     // Restore original console methods
                     process.stdout.write = originalWrite;
                     console.log = originalLog;
-                    
+
                     console.log(`\n✅ Download finished: ${outputPath}`);
                     updateVideosJson(sanitizedTitle, metadata.description, 'downloaded', timestamp, outputFilename);
                     if (progressCallback) progressCallback({ message: `DOWNLOADED: ${outputPath}`, progress: 100, isComplete: true, finalPath: outputPath });
@@ -255,7 +255,7 @@ async function downloadYouTubeVideo(url, progressCallback) {
 }
 
 function updateVideosJson(videoName, description, status, timestamp, filename) {
-    const videosJsonPath = path.join(__dirname, 'videos.json');
+    const videosJsonPath = path.join(__dirname, '../data/videos.json');
     let videosData = { videos: [] };
 
     if (fs.existsSync(videosJsonPath)) {

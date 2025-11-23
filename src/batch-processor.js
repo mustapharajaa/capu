@@ -10,18 +10,18 @@ const { runSimpleUpload } = require('./timeline_test');
  */
 class BatchProcessor {
     constructor() {
-        this.queueFile = path.join(__dirname, 'new videos');
-        this.processedFile = path.join(__dirname, 'processed videos');
-        this.editorsFile = path.join(__dirname, 'editors.json');
+        this.queueFile = path.join(__dirname, '../data/new videos');
+        this.processedFile = path.join(__dirname, '../data/processed videos');
+        this.editorsFile = path.join(__dirname, '../config/editors.json');
         this.isProcessing = false;
         this.currentVideo = null;
         this.recentlyStarted = 0; // Track automations started but not yet marked as running
         this.lastStartTime = 0; // Track when we last started automations
         this.lastAutomationStart = 0; // Track when we last started any automation (for 3-minute spacing)
-        
+
         // Clean up old temp files on startup
         this.cleanupOldTempFiles();
-        
+
         // Set up periodic cleanup every 2 days (48 hours)
         this.setupPeriodicCleanup();
     }
@@ -31,12 +31,12 @@ class BatchProcessor {
      */
     setupPeriodicCleanup() {
         const twoDaysInMs = 2 * 24 * 60 * 60 * 1000; // 48 hours in milliseconds
-        
+
         setInterval(() => {
             console.log('🕐 Running periodic temp file cleanup (every 2 days)...');
             this.cleanupOldTempFiles();
         }, twoDaysInMs);
-        
+
         console.log('⏰ Periodic temp file cleanup scheduled every 2 days');
     }
 
@@ -45,17 +45,17 @@ class BatchProcessor {
      */
     cleanupOldTempFiles() {
         try {
-            const tempDir = path.join(__dirname, 'temp');
-            
+            const tempDir = path.join(__dirname, '../temp');
+
             if (!fs.existsSync(tempDir)) {
                 console.log('📁 Temp directory does not exist - skipping cleanup');
                 return;
             }
-            
+
             const files = fs.readdirSync(tempDir);
             const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000); // 24 hours in milliseconds
             let cleanedCount = 0;
-            
+
             files.forEach(file => {
                 if (file.startsWith('processing_') && file.endsWith('.tmp')) {
                     const filePath = path.join(tempDir, file);
@@ -64,15 +64,15 @@ class BatchProcessor {
                         const fileContent = fs.readFileSync(filePath, 'utf8');
                         const lines = fileContent.split('\n');
                         const startedLine = lines.find(line => line.startsWith('Started:'));
-                        
+
                         if (startedLine) {
                             const timestampStr = startedLine.replace('Started: ', '').trim();
                             const fileTimestamp = new Date(timestampStr).getTime();
                             const fileAge = Date.now() - fileTimestamp;
                             const fileAgeHours = Math.round(fileAge / (1000 * 60 * 60));
-                            
+
                             console.log(`🔍 Checking temp file: ${file} (age: ${fileAgeHours} hours, started: ${timestampStr})`);
-                            
+
                             if (fileTimestamp < oneDayAgo) {
                                 fs.unlinkSync(filePath);
                                 cleanedCount++;
@@ -85,9 +85,9 @@ class BatchProcessor {
                             const stats = fs.statSync(filePath);
                             const fileAge = Date.now() - stats.mtime.getTime();
                             const fileAgeHours = Math.round(fileAge / (1000 * 60 * 60));
-                            
+
                             console.log(`🔍 Checking temp file: ${file} (age: ${fileAgeHours} hours - using file system time)`);
-                            
+
                             if (stats.mtime.getTime() < oneDayAgo) {
                                 fs.unlinkSync(filePath);
                                 cleanedCount++;
@@ -101,13 +101,13 @@ class BatchProcessor {
                     }
                 }
             });
-            
+
             if (cleanedCount > 0) {
                 console.log(`🧹 Cleaned up ${cleanedCount} old temp files (older than 1 day)`);
             } else {
                 console.log('✅ No old temp files to clean up');
             }
-            
+
         } catch (error) {
             console.error('❌ Error during temp file cleanup:', error.message);
         }
@@ -150,10 +150,10 @@ class BatchProcessor {
 
             const editorsData = JSON.parse(fs.readFileSync(this.editorsFile, 'utf8'));
             const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
-            const availableEditors = editors.filter(editor => 
+            const availableEditors = editors.filter(editor =>
                 editor.status === 'available' && editor.result !== 'running'
             );
-            
+
             console.log(`📊 Editor availability: ${availableEditors.length}/${editors.length} available (status='available' AND result!='running')`);
             return availableEditors.length > 0;
         } catch (error) {
@@ -169,15 +169,15 @@ class BatchProcessor {
         try {
             const urls = this.readQueueFile();
             const remainingUrls = urls.filter(url => url !== processedUrl);
-            
+
             fs.writeFileSync(this.queueFile, remainingUrls.join('\n') + (remainingUrls.length > 0 ? '\n' : ''));
             console.log(`🗑️ Removed processed URL from queue: ${processedUrl}`);
-            
+
             // Add to processed file for history
             const processedContent = fs.existsSync(this.processedFile) ? fs.readFileSync(this.processedFile, 'utf8') : '';
             const timestamp = new Date().toISOString();
             fs.appendFileSync(this.processedFile, `${timestamp} - ${processedUrl}\n`);
-            
+
         } catch (error) {
             console.error('❌ Error removing URL from queue:', error.message);
         }
@@ -214,19 +214,19 @@ class BatchProcessor {
             }, url);
 
             console.log('✅ Automation completed successfully!');
-            
+
             // Step 3: Remove from queue
             this.removeFromQueue(url);
-            
+
             console.log(`🎉 Batch processing completed for: ${url}\n`);
             return true;
 
         } catch (error) {
             console.error(`❌ Batch processing failed for ${url}:`, error.message);
-            
+
             // Still remove from queue to prevent infinite retries
             this.removeFromQueue(url);
-            
+
             return false;
         } finally {
             this.currentVideo = null;
@@ -244,11 +244,10 @@ class BatchProcessor {
 
             const editorsData = JSON.parse(fs.readFileSync(this.editorsFile, 'utf8'));
             const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
-            const availableEditors = editors.filter(editor => 
+            const availableEditors = editors.filter(editor =>
                 editor.status === 'available' && editor.result !== 'running'
             );
-            
-            console.log(`🔍 DEBUG: Available editors (status='available' AND result!='running'): ${availableEditors.length}`);
+
             return availableEditors.length;
         } catch (error) {
             console.error('❌ Error getting available editors count:', error.message);
@@ -268,16 +267,15 @@ class BatchProcessor {
 
             const editorsData = JSON.parse(fs.readFileSync(this.editorsFile, 'utf8'));
             const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
-            
+
             const runningEditors = editors.filter(editor => editor.result === 'running');
-            
+
             // Debug: Show all editor statuses
-            console.log('🔍 DEBUG: Editor statuses:');
-            editors.forEach((editor, index) => {
-                console.log(`  Editor ${index + 1}: status="${editor.status}", result="${editor.result}"`);
-            });
-            
-            console.log(`🔍 DEBUG: Found ${runningEditors.length} editors with result="running"`);
+            // console.log('🔍 DEBUG: Editor statuses:');
+            // editors.forEach((editor, index) => {
+            //     console.log(`  Editor ${index + 1}: status="${editor.status}", result="${editor.result}"`);
+            // });
+
             return runningEditors.length;
         } catch (error) {
             console.error('❌ Error getting running automations count:', error.message);
@@ -302,20 +300,20 @@ class BatchProcessor {
                 // Check for running automations first (hard limit of 3)
                 const runningCount = this.getRunningAutomationsCount();
                 console.log(`🔍 DEBUG: Currently ${runningCount} automations running`);
-                
+
                 // Check if we recently started automations (within last 2 minutes) and they haven't been marked as running yet
                 const timeSinceLastStart = Date.now() - this.lastStartTime;
                 const effectiveRunningCount = runningCount + this.recentlyStarted;
-                
+
                 if (timeSinceLastStart < 120000 && this.recentlyStarted > 0) { // 2 minutes
-                    console.log(`🔍 DEBUG: Recently started ${this.recentlyStarted} automations ${Math.round(timeSinceLastStart/1000)}s ago, effective count: ${effectiveRunningCount}`);
+                    console.log(`🔍 DEBUG: Recently started ${this.recentlyStarted} automations ${Math.round(timeSinceLastStart / 1000)}s ago, effective count: ${effectiveRunningCount}`);
                 }
-                
+
                 // Reset recently started count if enough time has passed
                 if (timeSinceLastStart > 120000) {
                     this.recentlyStarted = 0;
                 }
-                
+
                 if (effectiveRunningCount >= 3) {
                     if (runningCount >= 3) {
                         console.log(`⏳ Maximum concurrent limit reached (${runningCount}/3 running) - waiting 3 minutes before retry...`);
@@ -336,7 +334,7 @@ class BatchProcessor {
 
                 // Read current queue
                 const urls = this.readQueueFile();
-                
+
                 if (urls.length === 0) {
                     console.log('📄 Queue is empty - waiting for new videos...');
                     // Don't break - keep monitoring for new videos
@@ -345,33 +343,33 @@ class BatchProcessor {
                 }
 
                 console.log(`📋 Found ${urls.length} URLs in queue, ${availableEditorsCount} editors available`);
-                
+
                 // Check if we need to wait 3 minutes since last automation start
                 const timeSinceLastAutomation = Date.now() - this.lastAutomationStart;
                 const minDelayBetweenAutomations = 180000; // 3 minutes in milliseconds
-                
+
                 if (this.lastAutomationStart > 0 && timeSinceLastAutomation < minDelayBetweenAutomations) {
                     const remainingWait = Math.ceil((minDelayBetweenAutomations - timeSinceLastAutomation) / 1000);
                     console.log(`⏳ Waiting ${remainingWait} seconds before starting next automation (3-minute spacing)...`);
                     await new Promise(resolve => setTimeout(resolve, minDelayBetweenAutomations - timeSinceLastAutomation));
                 }
-                
+
                 // ATOMIC URL ASSIGNMENT: Find an unclaimed URL by checking temp files
                 let currentUrl = null;
                 let urlIndex = -1;
-                
+
                 for (let i = 0; i < urls.length; i++) {
                     const url = urls[i];
                     const urlHash = require('crypto').createHash('md5').update(url).digest('hex');
-                    const tempDir = path.join(__dirname, 'temp');
-                    
+                    const tempDir = path.join(__dirname, '../temp');
+
                     // Create temp directory if it doesn't exist
                     if (!fs.existsSync(tempDir)) {
                         fs.mkdirSync(tempDir, { recursive: true });
                     }
-                    
+
                     const tempFile = path.join(tempDir, `processing_${urlHash}.tmp`);
-                    
+
                     // Check if this URL is already being processed
                     if (!fs.existsSync(tempFile)) {
                         // Claim this URL by creating temp file
@@ -387,28 +385,28 @@ class BatchProcessor {
                         }
                     }
                 }
-                
+
                 if (!currentUrl) {
                     console.log('⏳ All URLs are currently being processed by other editors - waiting...');
                     await new Promise(resolve => setTimeout(resolve, 20000)); // Wait 20 seconds
                     continue;
                 }
-                
+
                 console.log(`🚀 Starting automation for: ${currentUrl}`);
-                
+
                 // Track that we just started an automation
                 this.recentlyStarted = 1;
                 this.lastStartTime = Date.now();
                 this.lastAutomationStart = Date.now(); // Track for 3-minute spacing
-                
+
                 // Start single automation without waiting for it to complete
                 const automationPromise = this.processSingleVideo(currentUrl);
-                
+
                 // Handle completion asynchronously (don't block queue monitoring)
                 automationPromise.then(success => {
                     // Clean up temp file
                     const urlHash = require('crypto').createHash('md5').update(currentUrl).digest('hex');
-                    const tempDir = path.join(__dirname, 'temp');
+                    const tempDir = path.join(__dirname, '../temp');
                     const tempFile = path.join(tempDir, `processing_${urlHash}.tmp`);
                     try {
                         if (fs.existsSync(tempFile)) {
@@ -418,7 +416,7 @@ class BatchProcessor {
                     } catch (error) {
                         console.error('⚠️ Error cleaning up temp file:', error.message);
                     }
-                    
+
                     if (success) {
                         console.log('✅ Video processed successfully');
                         // Remove from queue only on success
@@ -427,16 +425,16 @@ class BatchProcessor {
                         console.log('❌ Video processing failed');
                         // On failure, don't remove from queue so it can be retried later
                     }
-                    
+
                     // Reset recently started count when automation completes
                     this.recentlyStarted = Math.max(0, this.recentlyStarted - 1);
                     console.log(`🔍 DEBUG: Automation completed, recently started count reset to ${this.recentlyStarted}`);
                 }).catch(error => {
                     console.error('❌ Automation error:', error.message);
-                    
+
                     // Clean up temp file on error too
                     const urlHash = require('crypto').createHash('md5').update(currentUrl).digest('hex');
-                    const tempDir = path.join(__dirname, 'temp');
+                    const tempDir = path.join(__dirname, '../temp');
                     const tempFile = path.join(tempDir, `processing_${urlHash}.tmp`);
                     try {
                         if (fs.existsSync(tempFile)) {
@@ -446,7 +444,7 @@ class BatchProcessor {
                     } catch (cleanupError) {
                         console.error('⚠️ Error cleaning up temp file:', cleanupError.message);
                     }
-                    
+
                     // Reset on error too
                     this.recentlyStarted = Math.max(0, this.recentlyStarted - 1);
                 });

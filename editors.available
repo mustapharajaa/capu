@@ -1,0 +1,288 @@
+{
+    "tabSwitching": {
+        "enabled": true,
+        "intervalSeconds": 31
+    },
+    "editors": [
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-09-04T02:24:04.359Z",
+            "result": "j",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:54:23.284Z",
+            "result": "aa",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T22:46:26.646Z",
+            "result": "mm",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:07:56.613Z",
+            "result": "runjning",
+            "errorType": "navigation_timeout"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:16:26.589Z",
+            "result": "runaning",
+            "errorType": "navigation_timeout"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        },
+        {
+            "url": "",
+            "status": "available",
+            "lastRun": "2025-08-26T23:38:47.798Z",
+            "result": "runkning",
+            "errorType": "unknown"
+        }
+    ]
+}
