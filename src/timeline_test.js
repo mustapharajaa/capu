@@ -1423,10 +1423,15 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         try {
                             const videosJsonPath = path.join(__dirname, '../data/videos.json');
                             if (fs.existsSync(videosJsonPath)) {
-                                const videosData = JSON.parse(fs.readFileSync(videosJsonPath, 'utf8'));
-                                const videoEntry = videosData.videos.find(v => v.filename === path.basename(videoPath));
-                                if (videoEntry) {
-                                    videoDescription = videoEntry.description || '';
+                                const fileContent = fs.readFileSync(videosJsonPath, 'utf8');
+                                if (fileContent) {
+                                    const videosData = JSON.parse(fileContent);
+                                    if (videosData && Array.isArray(videosData.videos)) {
+                                        const videoEntry = videosData.videos.find(v => v.filename === path.basename(videoPath));
+                                        if (videoEntry) {
+                                            videoDescription = videoEntry.description || '';
+                                        }
+                                    }
                                 }
                             }
                         } catch (metadataError) {
@@ -1440,10 +1445,24 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                             cleanUrl = cleanUrl.split(' - ').pop().trim();
                         }
 
+                        // Get the current actual editor URL from the page (to capture the specific project ID)
+                        let currentEditorUrl = editorUrl;
+                        try {
+                            if (page && !page.isClosed()) {
+                                const actualUrl = page.url();
+                                if (actualUrl && actualUrl.includes('capcut.com/editor')) {
+                                    currentEditorUrl = actualUrl;
+                                    console.log(`🔗 Using actual project URL for logging: ${currentEditorUrl}`);
+                                }
+                            }
+                        } catch (urlError) {
+                            console.log('⚠️ Could not get current page URL, using initial editor URL');
+                        }
+
                         const sheetsData = {
                             title: videoName,
                             description: videoDescription,
-                            editorUrl: editorUrl,
+                            editorUrl: currentEditorUrl,
                             originalUrl: cleanUrl
                         };
 
@@ -1510,7 +1529,9 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 const currentEditor = editors.find(editor => editor.url === editorUrl);
                 if (currentEditor) {
                     currentEditor.result = 'complete';
+                    currentEditor.status = 'available'; // Reset to available so it can be reused
                     fs.writeFileSync(editorsPath, JSON.stringify(editorsData, null, 4));
+                    console.log('📝 Editor status reset to "available" for next task');
                 }
             }
         } catch (updateError) {
