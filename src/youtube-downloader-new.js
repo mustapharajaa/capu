@@ -230,6 +230,14 @@ async function downloadYouTubeVideo(url, progressCallback) {
                         if (progressCallback) progressCallback({ message: 'Merging video and audio...' });
                     }
 
+                    // Log other FFmpeg activities (Fixup, PostProcessor)
+                    if (eventType === 'Fixup' || eventType === 'PostProcessor' || eventData.includes('Fixup') || eventData.includes('ffmpeg')) {
+                        if (!eventData.includes('Merging formats')) { // Avoid duplicate if caught above
+                            console.log(`\n🔄 Processing video with FFmpeg...`);
+                            if (progressCallback) progressCallback({ message: 'Processing video with FFmpeg...' });
+                        }
+                    }
+
                     if (progressCallback) progressCallback({ message: `[${eventType}] ${eventData}` });
                 })
                 .on('error', (error) => {
