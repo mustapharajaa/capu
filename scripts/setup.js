@@ -180,7 +180,9 @@ async function setupWindows() {
         }
 
         // Download FFmpeg
-        if (!fs.existsSync(ffmpegPath)) {
+        const ffmpegNpmPath = path.join(__dirname, '../node_modules/@ffmpeg-installer/win32-x64/ffmpeg.exe');
+
+        if (!fs.existsSync(ffmpegPath) && !fs.existsSync(ffmpegNpmPath)) {
             console.log('📥 Downloading FFmpeg...');
             const ffmpegZipPath = path.join(binDir, 'ffmpeg.zip');
 
@@ -236,19 +238,21 @@ async function setupWindows() {
                 console.log('⚠️  FFmpeg download/extraction failed, trying npm package...');
                 try {
                     execSync('npm install @ffmpeg-installer/ffmpeg', { stdio: 'inherit' });
-                    // Update ffmpegPath to point to npm package
-                    const ffmpegNpmPath = path.join(__dirname, '../node_modules/@ffmpeg-installer/win32-x64/ffmpeg.exe');
-                    if (fs.existsSync(ffmpegNpmPath)) {
-                        ffmpegPath = ffmpegNpmPath;
-                    }
                     console.log('✅ FFmpeg npm package installed as fallback');
                 } catch (npmError) {
-                    console.error('❌ Both FFmpeg download and npm install failed');
-                    throw error;
+                    console.log('⚠️  npm install failed, but package may already exist');
                 }
             }
+        }
+
+        // Determine final ffmpeg path (check both binary and npm package)
+        if (fs.existsSync(ffmpegPath)) {
+            console.log('✅ FFmpeg binary found');
+        } else if (fs.existsSync(ffmpegNpmPath)) {
+            ffmpegPath = ffmpegNpmPath;
+            console.log('✅ FFmpeg npm package found');
         } else {
-            console.log('✅ FFmpeg already exists');
+            console.log('⚠️  FFmpeg not found in expected locations');
         }
 
         // Download Chrome for Testing
