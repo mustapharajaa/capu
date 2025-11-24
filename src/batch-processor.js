@@ -200,7 +200,8 @@ class BatchProcessor {
             // Step 1: Download the video
             console.log('📥 Step 1: Downloading YouTube video...');
             const downloadedPath = await downloadYouTubeVideo(url, (progress) => {
-                if (progress.message) {
+                // Only log non-progress messages to avoid duplicate progress bars
+                if (progress.message && !progress.message.startsWith('Downloading...')) {
                     console.log(`📥 Download Progress: ${progress.message}`);
                 }
             });

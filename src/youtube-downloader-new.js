@@ -220,8 +220,14 @@ async function downloadYouTubeVideo(url, progressCallback) {
                         }
                     }
 
+                    // Filter out verbose download progress events (fragments, percentages)
+                    if (eventType === 'download' && (eventData.includes('frag') || eventData.includes('%') || eventData.includes('ETA'))) {
+                        return; // Skip verbose download logs
+                    }
+
                     if (eventType === 'Merger' || eventData.includes('Merging formats')) {
-                        console.log(`🔧 FFmpeg: ${eventData}`);
+                        console.log(`\n🔄 Merging video and audio...`);
+                        if (progressCallback) progressCallback({ message: 'Merging video and audio...' });
                     }
 
                     if (progressCallback) progressCallback({ message: `[${eventType}] ${eventData}` });
