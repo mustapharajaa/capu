@@ -167,7 +167,7 @@ async function setupWindows() {
 
     const ytdlpPath = path.join(binDir, 'yt-dlp.exe');
     const ffmpegDir = path.join(binDir, 'ffmpeg');
-    const ffmpegPath = path.join(ffmpegDir, 'ffmpeg.exe');
+    let ffmpegPath = path.join(ffmpegDir, 'ffmpeg.exe');
     const chromeDir = path.join(binDir, 'chrome');
     const chromePath = path.join(chromeDir, 'chrome.exe');
 
