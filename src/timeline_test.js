@@ -1526,7 +1526,14 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             if (fs.existsSync(editorsPath)) {
                 const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
                 const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
-                const currentEditor = editors.find(editor => editor.url === editorUrl);
+                // Use index if available (more robust if URL changed), otherwise fallback to URL matching
+                let currentEditor;
+                if (currentEditorIndex !== -1 && editors[currentEditorIndex]) {
+                    currentEditor = editors[currentEditorIndex];
+                } else {
+                    currentEditor = editors.find(editor => editor.url === editorUrl);
+                }
+
                 if (currentEditor) {
                     currentEditor.result = 'complete';
                     currentEditor.status = 'available'; // Reset to available so it can be reused
