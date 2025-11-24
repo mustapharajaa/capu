@@ -84,6 +84,17 @@ function initializeConfigFiles() {
         fs.writeFileSync(videosJsonPath, '[]');
         console.log('✅ Created videos.json');
     }
+
+    // Initialize .env file from template
+    const envTemplatePath = path.join(__dirname, '../.env.example');
+    const envActualPath = path.join(__dirname, '../.env');
+
+    if (!fs.existsSync(envActualPath) && fs.existsSync(envTemplatePath)) {
+        fs.copyFileSync(envTemplatePath, envActualPath);
+        console.log('✅ Created .env from template');
+    } else if (fs.existsSync(envActualPath)) {
+        console.log('ℹ️  .env already exists (will update paths)');
+    }
 }
 
 async function downloadFile(url, outputPath, retries = 3) {
@@ -225,6 +236,11 @@ async function setupWindows() {
                 console.log('⚠️  FFmpeg download/extraction failed, trying npm package...');
                 try {
                     execSync('npm install @ffmpeg-installer/ffmpeg', { stdio: 'inherit' });
+                    // Update ffmpegPath to point to npm package
+                    const ffmpegNpmPath = path.join(__dirname, '../node_modules/@ffmpeg-installer/win32-x64/ffmpeg.exe');
+                    if (fs.existsSync(ffmpegNpmPath)) {
+                        ffmpegPath = ffmpegNpmPath;
+                    }
                     console.log('✅ FFmpeg npm package installed as fallback');
                 } catch (npmError) {
                     console.error('❌ Both FFmpeg download and npm install failed');
