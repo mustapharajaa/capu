@@ -169,3 +169,6 @@ youtube-cookies.txt
 *.jpeg
 debug_*
 screenshot_*
+
+# Local AI Tool
+local-ai/

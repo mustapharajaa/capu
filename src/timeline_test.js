@@ -99,7 +99,10 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
     try {
         console.log('🚀 Starting CapCut automation...');
 
-        // Set editor status to "in-use" when automation starts
+        // Track which editor index we are using to update it later if needed
+        let currentEditorIndex = -1;
+        let isNewProject = false;
+
         try {
             const editorsPath = path.join(__dirname, '../config/editors.json');
             if (fs.existsSync(editorsPath)) {
@@ -109,16 +112,29 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
 
                 // Find an available editor and mark it as in-use
-                const availableEditor = editors.find(editor => editor.status === 'available');
-                if (availableEditor) {
-                    editorUrl = availableEditor.url;
+                const availableEditorIndex = editors.findIndex(editor => editor.status === 'available');
+
+                if (availableEditorIndex !== -1) {
+                    const availableEditor = editors[availableEditorIndex];
+                    currentEditorIndex = availableEditorIndex;
+
+                    // Check if URL is empty - if so, we'll need to capture the new one
+                    if (!availableEditor.url || availableEditor.url.trim() === '') {
+                        console.log('🆕 Empty editor URL detected - will create new project and save URL');
+                        editorUrl = 'https://www.capcut.com/editor';
+                        isNewProject = true;
+                    } else {
+                        editorUrl = availableEditor.url;
+                    }
+
                     // Set editor status to "in-use" and record start time
                     availableEditor.status = 'in-use';
                     availableEditor.lastRun = new Date().toISOString();
                     availableEditor.result = 'running'; // Will be updated to 'complete' or 'error' later
+
                     fs.writeFileSync(editorsPath, JSON.stringify(editorsData, null, 4));
-                    console.log('📝 Editor status set to "in-use"');
-                    if (progressCallback) progressCallback('📝 Editor reserved for automation');
+                    console.log(`📝 Editor #${currentEditorIndex + 1} reserved for automation`);
+                    if (progressCallback) progressCallback(`📝 Editor #${currentEditorIndex + 1} reserved`);
                 } else {
                     console.log('❌ All editors are currently in-use - automation blocked');
                     if (progressCallback) progressCallback('❌ All editors busy - please wait');
@@ -342,6 +358,51 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             waitUntil: 'networkidle2',
             timeout: 420000  // 7 minutes for very slow CapCut loading
         });
+
+        // Monitor for new project URL if we started with an empty URL
+        if (isNewProject) {
+            console.log('🆕 Monitoring for new project URL (draftId/spaceId)...');
+            // Start a non-blocking interval to check URL
+            const urlCheckInterval = setInterval(async () => {
+                try {
+                    // Safety check if page/browser is closed
+                    if (!page || page.isClosed()) {
+                        clearInterval(urlCheckInterval);
+                        return;
+                    }
+
+                    const currentUrl = page.url();
+                    // Check for indicators of a specific project URL
+                    if (currentUrl.includes('draftId') || (currentUrl.includes('workspaceId') && currentUrl.includes('spaceId'))) {
+                        console.log(`🆕 Detected new project URL: ${currentUrl}`);
+
+                        // Update editors.json
+                        try {
+                            const editorsPath = path.join(__dirname, '../config/editors.json');
+                            if (fs.existsSync(editorsPath)) {
+                                const editorsData = JSON.parse(fs.readFileSync(editorsPath, 'utf8'));
+                                const editors = Array.isArray(editorsData) ? editorsData : editorsData.editors;
+
+                                if (editors[currentEditorIndex]) {
+                                    // Only update if it's still the generic URL or empty
+                                    if (!editors[currentEditorIndex].url || editors[currentEditorIndex].url.includes('capcut.com/editor') && !editors[currentEditorIndex].url.includes('draftId')) {
+                                        editors[currentEditorIndex].url = currentUrl;
+                                        fs.writeFileSync(editorsPath, JSON.stringify(editorsData, null, 4));
+                                        console.log(`💾 Saved new URL for Editor #${currentEditorIndex + 1} to config`);
+                                        if (progressCallback) progressCallback(`💾 Saved new project URL for Editor #${currentEditorIndex + 1}`);
+                                        clearInterval(urlCheckInterval); // Stop checking once saved
+                                    }
+                                }
+                            }
+                        } catch (err) {
+                            console.error('❌ Error saving new URL:', err.message);
+                        }
+                    }
+                } catch (e) {
+                    // Ignore errors (page might be busy/closed)
+                }
+            }, 5000); // Check every 5 seconds
+        }
 
         if (progressCallback) progressCallback('📄 Page loaded, waiting for timeline...');
 
