@@ -53,27 +53,70 @@ accept TCP 3000 0.0.0.0/0 (Web App)
 
 
 
-Open: http://localhost:3000/go
+# CapCut Web Automation System
 
+Automated video processing system for CapCut web editor with background removal capabilities.
 
-## 📋 Features
+## Features
 
-### ✅ Core Functionality
-- **YouTube Video Download**: Automatic download with metadata
-- **CapCut Integration**: Automated video upload and processing
-- **Background Removal**: AI-powered background removal automation
-- **Batch Processing**: Process multiple videos concurrently
-- **Google Sheets Logging**: Automatic completion logging
-- **Real-time Progress**: Live progress tracking and notifications
+- **YouTube Video Download**: Automatically download videos from YouTube URLs
+- **Batch Processing**: Process multiple videos from a queue file
+- **Background Removal**: Automatic background removal using CapCut's AI tools with progress monitoring (0-100%)
+- **Google Sheets Integration**: Log completed videos to Google Sheets
+- **Concurrent Processing**: Process up to 3 videos simultaneously
+- **RDP Compatible**: Works reliably in Remote Desktop environments
+- **Web Interface**: Monitor and control the automation through a web UI
+- **Auto Setup**: One-click setup that installs Node.js, Chrome, yt-dlp, and FFmpeg
 
-### ✅ Advanced Features
-- **Multi-Editor Support**: Concurrent automation across multiple CapCut editors
-- **Robust Error Handling**: Comprehensive error recovery and cleanup
-- **File Management**: Automatic cleanup of processed files
-- **Status Tracking**: Complete video lifecycle tracking
-- **Browser Persistence**: Reusable browser sessions for efficiency
+## Quick Start (⚡ Fully Automated)
 
-## 🔧 Configuration
+### Windows - Complete Auto-Setup
+
+**Just run ONE command and everything installs automatically!**
+
+1. **Download or clone the project**:
+   ```bash
+   # Option 1: Download ZIP from GitHub and extract
+   # Option 2: Clone with git
+   git clone https://github.com/mustapharajaa/capu.git
+   cd capu
+   ```
+
+2. **Run the automated setup** (installs EVERYTHING):
+   ```bash
+   scripts\setup.bat
+   ```
+   
+   ✅ This ONE command automatically:
+   - ✅ Downloads and installs **Node.js v20** (if not installed)
+   - ✅ Installs all **npm dependencies**
+   - ✅ Downloads **Chrome for Testing**
+   - ✅ Downloads **yt-dlp** and **FFmpeg**
+   - ✅ Configures all paths in `.env`
+   
+   **Note**: After Node.js installation, you may need to close and reopen your terminal, then run `scripts\setup.bat` again.
+
+3. **Start the server**:
+   ```bash
+   npm start
+   ```
+
+4. **Open your browser**:
+   - Main interface: http://localhost:3000
+   - Management page: http://localhost:3000/go
+
+### Fresh RDP Server Setup
+
+If you're on a **completely fresh Windows RDP server** with nothing installed:
+
+1. Open PowerShell as Administrator
+2. Navigate to the project folder
+3. Run:
+   ```powershell
+   scripts\setup.bat
+   ```
+
+That's it! Everything will be installed automatically.n
 
 ### Environment Variables (.env)
 The setup script automatically configures these, but you can customize:
