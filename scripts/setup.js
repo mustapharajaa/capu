@@ -22,12 +22,68 @@ console.log('========================');
 
 const isWindows = os.platform() === 'win32';
 const binDir = path.join(__dirname, '../bin');
+const configDir = path.join(__dirname, '../config');
+const dataDir = path.join(__dirname, '../data');
 const envPath = path.join(__dirname, '../.env');
 
-// Create bin directory
+// Create necessary directories
 if (!fs.existsSync(binDir)) {
     fs.mkdirSync(binDir, { recursive: true });
     console.log('📁 Created bin directory');
+}
+
+if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
+    console.log('📁 Created config directory');
+}
+
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+    console.log('📁 Created data directory');
+}
+
+// Initialize config files from templates
+function initializeConfigFiles() {
+    console.log('📋 Initializing configuration files...');
+
+    const configFiles = [
+        { template: 'editors.json.example', actual: 'editors.json' },
+        { template: 'cookies.json.example', actual: 'cookies.json' },
+        { template: 'youtube-cookies.txt.example', actual: 'youtube-cookies.txt' },
+        { template: 'capcut-sheet-service-account.json.example', actual: 'capcut-sheet-service-account.json' }
+    ];
+
+    configFiles.forEach(({ template, actual }) => {
+        const templatePath = path.join(configDir, template);
+        const actualPath = path.join(configDir, actual);
+
+        if (!fs.existsSync(actualPath) && fs.existsSync(templatePath)) {
+            fs.copyFileSync(templatePath, actualPath);
+            console.log(`✅ Created ${actual} from template`);
+        } else if (fs.existsSync(actualPath)) {
+            console.log(`ℹ️  ${actual} already exists (keeping current)`);
+        }
+    });
+
+    // Create data files
+    const newVideosPath = path.join(dataDir, 'new videos');
+    const processedVideosPath = path.join(dataDir, 'processed videos');
+    const videosJsonPath = path.join(dataDir, 'videos.json');
+
+    if (!fs.existsSync(newVideosPath)) {
+        fs.writeFileSync(newVideosPath, '');
+        console.log('✅ Created "new videos" file');
+    }
+
+    if (!fs.existsSync(processedVideosPath)) {
+        fs.writeFileSync(processedVideosPath, '');
+        console.log('✅ Created "processed videos" file');
+    }
+
+    if (!fs.existsSync(videosJsonPath)) {
+        fs.writeFileSync(videosJsonPath, '[]');
+        console.log('✅ Created videos.json');
+    }
 }
 
 async function downloadFile(url, outputPath, retries = 3) {
@@ -297,6 +353,10 @@ function updateEnvFile(ytdlpPath, ffmpegPath, chromePath) {
 
 async function main() {
     try {
+        // Initialize config and data directories first
+        initializeConfigFiles();
+        console.log('');
+
         if (isWindows) {
             await setupWindows();
         } else {
