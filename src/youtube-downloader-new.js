@@ -14,6 +14,25 @@ if (!YTDLP_BINARY_PATH || !fs.existsSync(YTDLP_BINARY_PATH)) {
 
 const ytDlpWrap = new YtDlpWrap(YTDLP_BINARY_PATH);
 
+// Verify yt-dlp binary integrity
+try {
+    const { execSync } = require('child_process');
+    execSync(`"${YTDLP_BINARY_PATH}" --version`, { stdio: 'ignore' });
+} catch (error) {
+    console.error('❌ Critical Error: yt-dlp binary appears to be corrupted!');
+    console.error('   This often happens due to interrupted downloads or antivirus interference.');
+
+    // Attempt to delete the corrupted file so it can be redownloaded
+    try {
+        fs.unlinkSync(YTDLP_BINARY_PATH);
+        console.log('🗑️  Deleted corrupted yt-dlp.exe');
+    } catch (delError) {
+        console.error('   Could not delete corrupted file:', delError.message);
+    }
+
+    throw new Error('yt-dlp binary is corrupted. Please run "scripts\\fix_dependencies.bat" to fix this.');
+}
+
 // Version identifier for tracking deployments
 console.log('🔧 YouTube Downloader Version: 2.0.0 - Reference App Compatible (2025-01-15)');
 
