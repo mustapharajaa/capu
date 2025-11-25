@@ -218,7 +218,8 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         console.log('🌐 Created new tab for automation');
 
         // Register this tab for switching if multiple automations are running
-        const editorId = editorUrl ? editorUrl.split('/editor/')[1]?.split('?')[0] : 'unknown';
+        // Use currentEditorIndex to ensure uniqueness even if URLs are identical
+        const editorId = currentEditorIndex !== -1 ? `editor_${currentEditorIndex}` : (editorUrl ? editorUrl.split('/editor/')[1]?.split('?')[0] : 'unknown');
         addEditorTab(editorId, page);
 
         // Ensure browser window is maximized and visible
@@ -1168,7 +1169,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 if (progressCallback) progressCallback('✅ Remove Background switch activated!');
 
                 // Monitor for background removal completion with retry logic
-                console.log('⏳ Monitoring background removal for up to 300 minutes...');
+                console.log('⏳ Monitoring background removal for up to 120 minutes...');
                 if (progressCallback) progressCallback('⏳ Monitoring background removal progress...');
 
                 let retryCount = 0;
@@ -1250,7 +1251,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                             }
 
                             return false; // Continue waiting
-                        }, { timeout: 300 * 60 * 1000, polling: 5000 }); // 300 minutes timeout, check every 5 seconds
+                        }, { timeout: 120 * 60 * 1000, polling: 5000 }); // 120 minutes timeout, check every 5 seconds
 
                         const resultValue = await result.jsonValue();
 
@@ -1297,8 +1298,15 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                         if (monitoringError.message.includes('Background removal failed after maximum retries')) {
                             throw monitoringError; // Re-throw background removal failures
                         }
-                        console.log('⚠️ Background removal monitoring timeout or error:', monitoringError.message);
-                        if (progressCallback) progressCallback('⚠️ Background removal monitoring timeout');
+
+                        // Check for timeout
+                        if (monitoringError.message.includes('Timeout') || monitoringError.message.includes('timeout')) {
+                            console.log('⏳ Background removal monitoring timed out after 120 minutes');
+                            throw new Error('Background removal timed out after 120 minutes');
+                        }
+
+                        console.log('⚠️ Background removal monitoring error:', monitoringError.message);
+                        if (progressCallback) progressCallback('⚠️ Background removal monitoring error');
                         break;
                     }
                 }
@@ -1561,6 +1569,10 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             errorType = 'target_closed';
             console.log('🚪 Browser tab closed unexpectedly');
             if (progressCallback) progressCallback('🚪 Browser tab closed unexpectedly');
+        } else if (error.message.includes('Background removal timed out')) {
+            errorType = 'background_removal_timeout';
+            console.log('⏳ Background removal timed out after 120 minutes');
+            if (progressCallback) progressCallback('⏳ Background removal timed out');
         }
 
         // Update editor result to "error" on failure
@@ -1580,8 +1592,10 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 
                 if (currentEditor) {
                     currentEditor.result = 'error';
+                    // currentEditor.status = 'available'; // User requested to keep as in-use
                     currentEditor.errorType = errorType; // Track error type for debugging
                     fs.writeFileSync(editorsPath, JSON.stringify(editorsData, null, 4));
+                    console.log('📝 Editor marked as "error" (status remains "in-use")');
                 }
             }
         } catch (updateError) {
@@ -1619,7 +1633,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
         throw error;
     } finally {
         // Remove this tab from switching rotation
-        const editorId = editorUrl ? editorUrl.split('/editor/')[1]?.split('?')[0] : 'unknown';
+        const editorId = currentEditorIndex !== -1 ? `editor_${currentEditorIndex}` : (editorUrl ? editorUrl.split('/editor/')[1]?.split('?')[0] : 'unknown');
         removeEditorTab(editorId);
 
         // Keep editor status as "in-use" - do not reset to available

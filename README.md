@@ -1,34 +1,30 @@
-# CapCut Automation System
-
-A comprehensive automation system for CapCut video processing with YouTube integration, background removal, and Google Sheets logging.
 
 ## Installation
 
-download folder    https://github.com/mustapharajaa/capu
+1, download folder    https://github.com/mustapharajaa/capu
 
-download chrome and yt dlp 
 
 in terminal not shell RUN THIS COMMANDS 
 
-.\setup.bat
-npm cache clean --force
-npm install
-node setup.js 
-                      if any package error  run rmdir /s /q node_modules
+2,  scripts\setup.bat
 
-                  1 set PUPPETEER_EXECUTABLE_PATH=
-                 2 set PUPPETEER_EXECUTABLE_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe
+close and run now terminal and run again scripts\setup.bat
                       
-1, edit .env details                                       
+3, edit .env details                                       
+       # Google Sheets integration 
 
-FFMPEG_PATH= #FFMPEG_PATH will use npm package fallback - comment out or remove the line above
+4, npm run start
 
-2, npm run start
+5, run rdp app in public commond
 
-    ^in localhost:3000/go or rdpip/go^
-3, editors.json & new videos & youtube-cookies.txt & google sheet  key & capcut cookies.json
+    netsh advfirewall firewall add rule name="CapCut Automation Port 3000" dir=in action=allow protocol=TCP localport=3000
+ 
 
-4,npm run start
+6,edite /go
+
+^in localhost:3000/go or rdpip/go^
+ editors.json & new videos & youtube-cookies.txt & google sheet  key & capcut cookies.json
+
 ```
 
 ⚠️ youtube cookies ⚠️
@@ -37,9 +33,6 @@ FFMPEG_PATH= #FFMPEG_PATH will use npm package fallback - comment out or remove 
 3, Export youtube.com cookies from the browser, then close the private browsing/incognito window so that the session is never opened in the browser again.
 
 
-⚠️run rdp app in public commond⚠️
-
-netsh advfirewall firewall add rule name="CapCut Automation Port 3000" dir=in action=allow protocol=TCP localport=3000
 
 
 
