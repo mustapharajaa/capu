@@ -95,13 +95,12 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
     let browser = null;
     let page = null;
     let editorUrl = null;
+    // Track which editor index we are using to update it later if needed
+    let currentEditorIndex = -1;
+    let isNewProject = false;
 
     try {
         console.log('🚀 Starting CapCut automation...');
-
-        // Track which editor index we are using to update it later if needed
-        let currentEditorIndex = -1;
-        let isNewProject = false;
 
         try {
             const editorsPath = path.join(__dirname, '../config/editors.json');
@@ -1536,9 +1535,9 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 
                 if (currentEditor) {
                     currentEditor.result = 'complete';
-                    currentEditor.status = 'available'; // Reset to available so it can be reused
+                    // currentEditor.status = 'available'; // User requested to keep as in-use
                     fs.writeFileSync(editorsPath, JSON.stringify(editorsData, null, 4));
-                    console.log('📝 Editor status reset to "available" for next task');
+                    console.log('📝 Editor marked as "complete" (status remains "in-use")');
                 }
             }
         } catch (updateError) {
@@ -1586,7 +1585,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 }
             }
         } catch (updateError) {
-            console.log('⚠️ Could not update editor result status');
+            console.log('⚠️ Could not update editor result status:', updateError.message);
         }
 
         // Delete failed video from uploads folder for cleanup
