@@ -285,6 +285,25 @@ class BatchProcessor {
     }
 
     /**
+     * Get count of downloaded files waiting in uploads directory
+     */
+    getDownloadedFilesCount() {
+        try {
+            const uploadsDir = path.join(__dirname, '../uploads');
+            if (!fs.existsSync(uploadsDir)) {
+                return 0;
+            }
+
+            const files = fs.readdirSync(uploadsDir);
+            const mp4Files = files.filter(file => file.endsWith('.mp4'));
+            return mp4Files.length;
+        } catch (error) {
+            console.error('❌ Error counting downloaded files:', error.message);
+            return 0;
+        }
+    }
+
+    /**
      * Process all videos in the queue with concurrent processing
      */
     async processQueue() {
@@ -300,7 +319,19 @@ class BatchProcessor {
             while (true) {
                 // Check for running automations first (hard limit of 3)
                 const runningCount = this.getRunningAutomationsCount();
-                console.log(`🔍 DEBUG: Currently ${runningCount} automations running`);
+
+                // Check for downloaded files waiting to be processed
+                const downloadedCount = this.getDownloadedFilesCount();
+
+                // Combined limit: running automations + waiting downloads should not exceed 3
+                // This prevents downloading more videos than we can process
+                if (downloadedCount >= 3) {
+                    console.log(`⏳ Download limit reached (${downloadedCount} files waiting) - waiting for processing...`);
+                    await new Promise(resolve => setTimeout(resolve, 60000)); // Wait 1 minute
+                    continue;
+                }
+
+                console.log(`🔍 DEBUG: Currently ${runningCount} automations running, ${downloadedCount} files waiting`);
 
                 // Check if we recently started automations (within last 2 minutes) and they haven't been marked as running yet
                 const timeSinceLastStart = Date.now() - this.lastStartTime;

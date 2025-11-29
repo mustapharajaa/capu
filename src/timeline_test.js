@@ -1492,11 +1492,14 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                 console.log(`⚠️ Failed to delete info file: ${infoCleanupError.message}`);
                             }
                         } else {
-                            console.log('⚠️ Google Sheets logging failed:', sheetsResult.error || sheetsResult.reason);
+                            const errorMsg = sheetsResult.error || sheetsResult.reason;
+                            console.log('⚠️ Google Sheets logging failed:', errorMsg);
+                            if (progressCallback) progressCallback(`⚠️ Sheet Log Failed: ${errorMsg}`);
                         }
 
                     } catch (sheetsError) {
                         console.log('⚠️ Google Sheets logging error:', sheetsError.message);
+                        if (progressCallback) progressCallback(`⚠️ Sheet Error: ${sheetsError.message}`);
                         // Don't fail the automation for Google Sheets errors
                     }
 
