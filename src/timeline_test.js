@@ -1071,78 +1071,93 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             console.log('🤖 Starting Smart AI Tools - Remove Background...');
             if (progressCallback) progressCallback('🤖 Starting Smart AI Tools - Remove Background...');
 
-            // Click video cutout button
-            await page.waitForTimeout(1000);
-            // Click video cutout button with robust fallback logic
-            await page.waitForTimeout(1000);
+            let cutoutPanelOpened = false;
 
-            const cutoutSelectors = [
-                '#workbench-tool-bar-toolbarVideoCutout',
-                '[data-testid="toolbar-video-cutout"]',
-                'div[aria-label="Cutout"]',
-                'div[aria-label="Remove background"]'
-            ];
+            // Try up to 4 times over ~60 seconds
+            for (let attempt = 1; attempt <= 4; attempt++) {
+                console.log(`🔄 Attempt ${attempt}/4 to open Smart Tools (Cutout)...`);
 
-            let cutoutClicked = false;
+                // Check loading icon (just for info)
+                const isLoading = await page.evaluate(() => {
+                    const icon = document.querySelector('.icon-loading-yVskrr, .icon-upload-wrap-tu_KdU');
+                    return icon && icon.offsetParent !== null;
+                });
+                if (isLoading) console.log('⏳ Loading icon visible, attempting click anyway...');
 
-            // Try to find and click the cutout button
-            for (const selector of cutoutSelectors) {
-                try {
-                    const element = await page.waitForSelector(selector, { visible: true, timeout: 2000 });
-                    if (element) {
-                        await element.click();
-                        console.log(`✅ Clicked video cutout button with selector: ${selector}`);
-                        cutoutClicked = true;
-                        break;
+                // Click video cutout button
+                await page.waitForTimeout(1000);
+                // Click video cutout button with robust fallback logic
+                await page.waitForTimeout(1000);
+
+                const cutoutSelectors = [
+                    '#workbench-tool-bar-toolbarVideoCutout',
+                    '[data-testid="toolbar-video-cutout"]',
+                    'div[aria-label="Cutout"]',
+                    'div[aria-label="Remove background"]'
+                ];
+
+                let cutoutClicked = false;
+
+                // Try to find and click the cutout button
+                for (const selector of cutoutSelectors) {
+                    try {
+                        const element = await page.waitForSelector(selector, { visible: true, timeout: 2000 });
+                        if (element) {
+                            await element.click();
+                            console.log(`✅ Clicked video cutout button with selector: ${selector}`);
+                            cutoutClicked = true;
+                            break;
+                        }
+                    } catch (e) {
+                        // Continue to next selector
                     }
-                } catch (e) {
-                    // Continue to next selector
                 }
-            }
 
-            // Fallback: Try finding by text if selectors fail
-            if (!cutoutClicked) {
-                console.log('⚠️ Standard cutout selectors failed, trying text search...');
-                try {
-                    const cutoutButton = await page.evaluateHandle(() => {
-                        const elements = Array.from(document.querySelectorAll('div, span, button'));
-                        return elements.find(el => {
-                            const text = el.innerText?.trim();
-                            return text === 'Cutout' || text === 'Remove background';
+                // Fallback: Try finding by text if selectors fail
+                if (!cutoutClicked) {
+                    console.log('⚠️ Standard cutout selectors failed, trying text search...');
+                    try {
+                        const cutoutButton = await page.evaluateHandle(() => {
+                            const elements = Array.from(document.querySelectorAll('div, span, button'));
+                            return elements.find(el => {
+                                const text = el.innerText?.trim();
+                                return text === 'Cutout' || text === 'Remove background';
+                            });
                         });
-                    });
 
-                    if (cutoutButton.asElement()) {
-                        await cutoutButton.asElement().click();
-                        console.log('✅ Clicked video cutout button via text search');
-                        cutoutClicked = true;
+                        if (cutoutButton.asElement()) {
+                            await cutoutButton.asElement().click();
+                            console.log('✅ Clicked video cutout button via text search');
+                            cutoutClicked = true;
+                        }
+                    } catch (e) {
+                        console.log('⚠️ Text search for cutout button failed');
                     }
-                } catch (e) {
-                    console.log('⚠️ Text search for cutout button failed');
+                }
+
+                // Wait a bit for panel to open
+                await page.waitForTimeout(2000);
+
+                // Check if panel opened (look for cutout card or remove background option)
+                const panelOpen = await page.evaluate(() => {
+                    return !!document.querySelector('#cutout-card, .cutout-card, .attribute-switch-field-des1');
+                });
+
+                if (panelOpen) {
+                    console.log('✅ Smart Tools panel opened successfully');
+                    cutoutPanelOpened = true;
+                    break;
+                } else {
+                    console.log('⚠️ Smart Tools panel not detected yet');
+                    if (attempt < 4) {
+                        console.log('⏳ Waiting 15s before retry...');
+                        await page.waitForTimeout(15000);
+                    }
                 }
             }
 
-            // If still not clicked, maybe video isn't selected? Try clicking timeline again
-            if (!cutoutClicked) {
-                console.log('⚠️ Cutout button not found - video might not be selected. Retrying timeline click...');
-                if (progressCallback) progressCallback('⚠️ Retrying video selection...');
-
-                // Try clicking center of screen (timeline area)
-                try {
-                    await page.mouse.click(window.screen.width / 2, window.screen.height / 2);
-                    await page.waitForTimeout(1000);
-
-                    // Try main selector again
-                    await page.click('#workbench-tool-bar-toolbarVideoCutout');
-                    console.log('✅ Clicked video cutout button after retry');
-                    cutoutClicked = true;
-                } catch (retryError) {
-                    console.log('❌ Failed to recover video selection:', retryError.message);
-                }
-            }
-
-            if (!cutoutClicked) {
-                throw new Error('Could not find or click "Cutout" button. Video selection may have failed.');
+            if (!cutoutPanelOpened) {
+                throw new Error('Failed to open Smart Tools panel after 4 attempts');
             }
 
             // Click remove backgrounds option with multiple fallbacks (automatic removal only)
@@ -1251,6 +1266,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 let stuckTimeout = 6 * 60 * 1000; // Start with 6 minutes for first attempt
                 let lastProgressPercentage = 0;
                 let stuckAt99StartTime = null;
+                let forcedRetryDueTo99 = false;
 
                 while (!backgroundRemovalComplete && retryCount <= maxRetries && (Date.now() - startTime < maxDuration)) {
                     try {
@@ -1340,6 +1356,9 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                     console.log('✅ Clicked failed switch to retry');
                                     if (progressCallback) progressCallback(`🔄 Retrying background removal (${retryCount}/${maxRetries})...`);
 
+                                    // Reset forced retry flag since we are starting a new attempt
+                                    forcedRetryDueTo99 = false;
+
                                     // Reset stuck detection for the new attempt
                                     currentAttemptStartTime = Date.now();
                                     // stuckTimeout = 60 * 1000; // KEEP 6 MINUTES as per user request
@@ -1351,9 +1370,15 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                     console.log('⚠️ Failed to click switch for retry:', retryError.message);
                                 }
                             } else {
-                                console.log('❌ Maximum retries reached. Background removal failed.');
-                                if (progressCallback) progressCallback('❌ Background removal failed after retries');
-                                throw new Error('Background removal failed after maximum retries');
+                                if (forcedRetryDueTo99) {
+                                    console.log('❌ Maximum retries reached. Background removal failed (Stuck at 99%).');
+                                    if (progressCallback) progressCallback('❌ Background removal failed (Stuck at 99%)');
+                                    throw new Error('Background removal failed (Stuck at 99%)');
+                                } else {
+                                    console.log('❌ Maximum retries reached. Background removal failed.');
+                                    if (progressCallback) progressCallback('❌ Background removal failed after retries');
+                                    throw new Error('Background removal failed after maximum retries');
+                                }
                             }
                         } else {
                             // RUNNING - Active Hover Monitoring
@@ -1364,6 +1389,9 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                 const stuckDurationSec = stuckTimeout / 1000;
                                 console.log(`⚠️ Background removal stuck at 99% for ${stuckDurationSec}s. Forcing retry...`);
                                 if (progressCallback) progressCallback(`⚠️ Stuck at 99% for ${stuckDurationSec}s. Forcing retry...`);
+
+                                // Mark this retry as caused by 99% stuck state
+                                forcedRetryDueTo99 = true;
 
                                 // Force switch OFF to trigger failure/retry logic in next iteration
                                 try {
@@ -1723,10 +1751,14 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             errorType = 'background_removal_timeout';
             console.log('⏳ Background removal timed out after 120 minutes');
             if (progressCallback) progressCallback('⏳ Background removal timed out');
-        } else if (error.message.includes('Background removal failed after maximum retries')) {
+        } else if (error.message.includes('Background removal failed (Stuck at 99%)')) {
             errorType = '99%';
-            console.log('❌ Background removal failed after maximum retries (likely stuck at 99%)');
+            console.log('❌ Background removal failed (Stuck at 99%)');
             if (progressCallback) progressCallback('❌ Background removal failed (Stuck at 99%)');
+        } else if (error.message.includes('Background removal failed after maximum retries')) {
+            // Generic max retries failure - do NOT assume 99% stuck
+            console.log('❌ Background removal failed after maximum retries');
+            if (progressCallback) progressCallback('❌ Background removal failed after retries');
         }
 
         // Update editor result to "error" on failure
@@ -1836,3 +1868,4 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 module.exports = {
     runSimpleUpload
 };
+
