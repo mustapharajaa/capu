@@ -295,8 +295,12 @@ class BatchProcessor {
             }
 
             const files = fs.readdirSync(uploadsDir);
-            const mp4Files = files.filter(file => file.endsWith('.mp4'));
-            return mp4Files.length;
+            const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv'];
+            const videoFiles = files.filter(file => {
+                const ext = path.extname(file).toLowerCase();
+                return videoExtensions.includes(ext);
+            });
+            return videoFiles.length;
         } catch (error) {
             console.error('❌ Error counting downloaded files:', error.message);
             return 0;

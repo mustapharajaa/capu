@@ -1073,9 +1073,77 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 
             // Click video cutout button
             await page.waitForTimeout(1000);
-            const cutoutButtonSelector = '#workbench-tool-bar-toolbarVideoCutout';
-            await page.click(cutoutButtonSelector);
-            console.log('✅ Clicked video cutout button');
+            // Click video cutout button with robust fallback logic
+            await page.waitForTimeout(1000);
+
+            const cutoutSelectors = [
+                '#workbench-tool-bar-toolbarVideoCutout',
+                '[data-testid="toolbar-video-cutout"]',
+                'div[aria-label="Cutout"]',
+                'div[aria-label="Remove background"]'
+            ];
+
+            let cutoutClicked = false;
+
+            // Try to find and click the cutout button
+            for (const selector of cutoutSelectors) {
+                try {
+                    const element = await page.waitForSelector(selector, { visible: true, timeout: 2000 });
+                    if (element) {
+                        await element.click();
+                        console.log(`✅ Clicked video cutout button with selector: ${selector}`);
+                        cutoutClicked = true;
+                        break;
+                    }
+                } catch (e) {
+                    // Continue to next selector
+                }
+            }
+
+            // Fallback: Try finding by text if selectors fail
+            if (!cutoutClicked) {
+                console.log('⚠️ Standard cutout selectors failed, trying text search...');
+                try {
+                    const cutoutButton = await page.evaluateHandle(() => {
+                        const elements = Array.from(document.querySelectorAll('div, span, button'));
+                        return elements.find(el => {
+                            const text = el.innerText?.trim();
+                            return text === 'Cutout' || text === 'Remove background';
+                        });
+                    });
+
+                    if (cutoutButton.asElement()) {
+                        await cutoutButton.asElement().click();
+                        console.log('✅ Clicked video cutout button via text search');
+                        cutoutClicked = true;
+                    }
+                } catch (e) {
+                    console.log('⚠️ Text search for cutout button failed');
+                }
+            }
+
+            // If still not clicked, maybe video isn't selected? Try clicking timeline again
+            if (!cutoutClicked) {
+                console.log('⚠️ Cutout button not found - video might not be selected. Retrying timeline click...');
+                if (progressCallback) progressCallback('⚠️ Retrying video selection...');
+
+                // Try clicking center of screen (timeline area)
+                try {
+                    await page.mouse.click(window.screen.width / 2, window.screen.height / 2);
+                    await page.waitForTimeout(1000);
+
+                    // Try main selector again
+                    await page.click('#workbench-tool-bar-toolbarVideoCutout');
+                    console.log('✅ Clicked video cutout button after retry');
+                    cutoutClicked = true;
+                } catch (retryError) {
+                    console.log('❌ Failed to recover video selection:', retryError.message);
+                }
+            }
+
+            if (!cutoutClicked) {
+                throw new Error('Could not find or click "Cutout" button. Video selection may have failed.');
+            }
 
             // Click remove backgrounds option with multiple fallbacks (automatic removal only)
             await page.waitForTimeout(2000); // Wait for UI to load
@@ -1175,11 +1243,17 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 let retryCount = 0;
                 const maxRetries = 4;
                 let backgroundRemovalComplete = false;
+                const maxDuration = 120 * 60 * 1000; // 120 minutes
+                const startTime = Date.now();
 
-                while (!backgroundRemovalComplete && retryCount <= maxRetries) {
+                // Stuck detection variables
+                let currentAttemptStartTime = Date.now();
+                let stuckTimeout = 6 * 60 * 1000; // Start with 6 minutes for first attempt
+
+                while (!backgroundRemovalComplete && retryCount <= maxRetries && (Date.now() - startTime < maxDuration)) {
                     try {
-                        const result = await page.waitForFunction(() => {
-                            // Find the specific background removal switch (not chroma key or other switches)
+                        // 1. Find the switch element handle (using the same robust logic as before)
+                        const switchHandle = await page.evaluateHandle(() => {
                             let backgroundRemovalSwitch = null;
 
                             // Method 1: Find by "Remove backgrounds automatically" text
@@ -1195,14 +1269,13 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                 }
                             }
 
-                            // Method 2: Find by cutout-specific selectors (exclude float-mode-panel and chroma key)
+                            // Method 2: Find by cutout-specific selectors
                             if (!backgroundRemovalSwitch) {
                                 const cutoutSelectors = [
                                     '#cutout-switch button[role="switch"]',
                                     '[data-testid="cutout-switch"] button[role="switch"]',
                                     '[data-testid="auto-cutout-switch"]'
                                 ];
-
                                 for (const selector of cutoutSelectors) {
                                     const element = document.querySelector(selector);
                                     if (element && element.offsetHeight > 0) {
@@ -1212,14 +1285,12 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                 }
                             }
 
-                            // Method 3: Find by nearby text (exclude float-mode-panel and chroma key)
+                            // Method 3: Find by nearby text
                             if (!backgroundRemovalSwitch) {
                                 const allSwitches = Array.from(document.querySelectorAll('button[role="switch"]'));
                                 for (const switchBtn of allSwitches) {
-                                    // Skip switches in float-mode-panel-container
                                     const floatModePanel = switchBtn.closest('#float-mode-panel-container');
                                     if (floatModePanel) continue;
-
                                     const parent = switchBtn.closest('div');
                                     if (parent) {
                                         const parentText = parent.innerText.toLowerCase();
@@ -1231,83 +1302,136 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                     }
                                 }
                             }
+                            return backgroundRemovalSwitch;
+                        });
 
-                            if (!backgroundRemovalSwitch) {
-                                return false; // Continue waiting if we can't find the specific switch
-                            }
+                        const switchElement = switchHandle.asElement();
 
-                            // Check if the specific background removal switch failed (turned to false)
-                            if (backgroundRemovalSwitch.getAttribute('aria-checked') === 'false') {
-                                return 'FAILED'; // Return special value for failed state
-                            }
+                        if (!switchElement) {
+                            console.log('⚠️ Could not find background removal switch, waiting...');
+                            await page.waitForTimeout(5000);
+                            continue;
+                        }
 
-                            // Check for successful completion (switch is true and not loading)
-                            if (backgroundRemovalSwitch.getAttribute('aria-checked') === 'true') {
-                                const isLoading = backgroundRemovalSwitch.classList.contains('lv-switch-loading') ||
-                                    backgroundRemovalSwitch.querySelector('.lv-icon-loading');
-                                if (!isLoading) {
-                                    return 'SUCCESS'; // Return special value for success
-                                }
-                            }
+                        // 2. Check Status
+                        const status = await page.evaluate(el => {
+                            if (el.getAttribute('aria-checked') === 'false') return 'FAILED';
+                            const isLoading = el.classList.contains('lv-switch-loading') || el.querySelector('.lv-icon-loading');
+                            if (el.getAttribute('aria-checked') === 'true' && !isLoading) return 'SUCCESS';
+                            return 'RUNNING';
+                        }, switchElement);
 
-                            return false; // Continue waiting
-                        }, { timeout: 120 * 60 * 1000, polling: 5000 }); // 120 minutes timeout, check every 5 seconds
-
-                        const resultValue = await result.jsonValue();
-
-                        if (resultValue === 'SUCCESS') {
+                        if (status === 'SUCCESS') {
                             console.log('✅ Background removal completed successfully!');
                             if (progressCallback) progressCallback('✅ Background removal completed successfully!');
                             backgroundRemovalComplete = true;
-                        } else if (resultValue === 'FAILED') {
+                            break;
+                        } else if (status === 'FAILED') {
                             retryCount++;
                             console.log(`⚠️ Background removal failed (switch turned off). Retry ${retryCount}/${maxRetries}...`);
                             if (progressCallback) progressCallback(`⚠️ Background removal failed. Retry ${retryCount}/${maxRetries}...`);
 
                             if (retryCount <= maxRetries) {
-                                // Click the switch again to retry
+                                // Retry logic
                                 try {
-                                    // Try CSS selector first
-                                    const failedSwitch = await page.$('button[role="switch"][aria-checked="false"]');
-                                    if (failedSwitch) {
-                                        await failedSwitch.click();
-                                        console.log('✅ Clicked failed switch to retry (CSS selector)');
-                                    } else {
-                                        // Try XPath selector as fallback
-                                        const failedSwitchXPath = await page.$x('//*[@id="cutout-switch"]/div/div/div/div/button[@aria-checked="false"]');
-                                        if (failedSwitchXPath.length > 0) {
-                                            await failedSwitchXPath[0].click();
-                                            console.log('✅ Clicked failed switch to retry (XPath selector)');
-                                        }
-                                    }
+                                    await switchElement.click();
+                                    console.log('✅ Clicked failed switch to retry');
                                     if (progressCallback) progressCallback(`🔄 Retrying background removal (${retryCount}/${maxRetries})...`);
-                                    await page.waitForTimeout(2000); // Wait 2 seconds before monitoring again
+
+                                    // Reset stuck detection for the new attempt
+                                    currentAttemptStartTime = Date.now();
+                                    stuckTimeout = 60 * 1000; // Reduce timeout to 1 minute for retries
+
+                                    await page.waitForTimeout(2000);
                                 } catch (retryError) {
                                     console.log('⚠️ Failed to click switch for retry:', retryError.message);
-                                    break;
                                 }
                             } else {
                                 console.log('❌ Maximum retries reached. Background removal failed.');
                                 if (progressCallback) progressCallback('❌ Background removal failed after retries');
                                 throw new Error('Background removal failed after maximum retries');
                             }
+                        } else {
+                            // RUNNING - Active Hover Monitoring
+
+                            // Check for stuck state (running too long without completion)
+                            if (Date.now() - currentAttemptStartTime > stuckTimeout) {
+                                const stuckDurationSec = stuckTimeout / 1000;
+                                console.log(`⚠️ Background removal stuck for ${stuckDurationSec}s. Forcing retry...`);
+                                if (progressCallback) progressCallback(`⚠️ Stuck for ${stuckDurationSec}s. Forcing retry...`);
+
+                                // Force switch OFF to trigger failure/retry logic in next iteration
+                                try {
+                                    await switchElement.click();
+                                    console.log('✅ Forced switch OFF to reset stuck process');
+                                    await page.waitForTimeout(2000);
+                                    continue; // Skip to next iteration to let FAILED logic handle the retry
+                                } catch (forceError) {
+                                    console.log('⚠️ Failed to force switch off:', forceError.message);
+                                }
+                            }
+
+                            try {
+                                // Hover over the switch to trigger potential tooltip
+                                await switchElement.hover();
+                                await page.waitForTimeout(500); // Wait for tooltip to appear
+
+                                // Scan for progress text
+                                const progressText = await page.evaluate(() => {
+                                    // Helper to check if text looks like progress
+                                    const isProgress = (text) => {
+                                        return /\d{1,3}%/.test(text) && !text.includes('100%'); // Ignore 100% (likely zoom) unless context implies otherwise
+                                    };
+
+                                    // 1. Check tooltips specifically
+                                    const tooltips = document.querySelectorAll('.lv-tooltip, .arco-tooltip-content, [role="tooltip"]');
+                                    for (const tooltip of tooltips) {
+                                        if (tooltip.innerText && isProgress(tooltip.innerText)) {
+                                            return tooltip.innerText.trim();
+                                        }
+                                    }
+
+                                    // 2. Check nearby text
+                                    // (This part is tricky without passing the element, but we can scan body)
+                                    // Let's just scan visible text nodes that contain %
+                                    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+                                    let node;
+                                    while (node = walker.nextNode()) {
+                                        const text = node.textContent.trim();
+                                        if (isProgress(text)) {
+                                            // Check if visible
+                                            const parent = node.parentElement;
+                                            if (parent && parent.offsetParent !== null && !parent.classList.contains('header-percent-text')) {
+                                                return text;
+                                            }
+                                        }
+                                    }
+                                    return null;
+                                });
+
+                                if (progressText) {
+                                    console.log(`📊 Progress detected: ${progressText}`);
+                                    if (progressCallback) progressCallback(`📊 Processing: ${progressText}`);
+                                } else {
+                                    // If no text found, just log running
+                                    // console.log('⏳ Background removal in progress...'); 
+                                }
+
+                            } catch (hoverError) {
+                                console.log('⚠️ Hover monitoring warning:', hoverError.message);
+                            }
+
+                            await page.waitForTimeout(30000); // Check every 30 seconds
                         }
 
                     } catch (monitoringError) {
-                        // If this is a background removal failure (not a timeout), re-throw it to fail automation
                         if (monitoringError.message.includes('Background removal failed after maximum retries')) {
-                            throw monitoringError; // Re-throw background removal failures
+                            throw monitoringError;
                         }
-
-                        // Check for timeout
-                        if (monitoringError.message.includes('Timeout') || monitoringError.message.includes('timeout')) {
-                            console.log('⏳ Background removal monitoring timed out after 120 minutes');
-                            throw new Error('Background removal timed out after 120 minutes');
-                        }
-
                         console.log('⚠️ Background removal monitoring error:', monitoringError.message);
                         if (progressCallback) progressCallback('⚠️ Background removal monitoring error');
-                        break;
+                        // Don't break, try to recover/continue monitoring
+                        await page.waitForTimeout(5000);
                     }
                 }
 
@@ -1576,6 +1700,10 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
             errorType = 'background_removal_timeout';
             console.log('⏳ Background removal timed out after 120 minutes');
             if (progressCallback) progressCallback('⏳ Background removal timed out');
+        } else if (error.message.includes('Background removal failed after maximum retries')) {
+            errorType = '99%';
+            console.log('❌ Background removal failed after maximum retries (likely stuck at 99%)');
+            if (progressCallback) progressCallback('❌ Background removal failed (Stuck at 99%)');
         }
 
         // Update editor result to "error" on failure
