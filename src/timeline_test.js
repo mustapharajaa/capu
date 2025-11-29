@@ -1091,9 +1091,14 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 
                 const cutoutSelectors = [
                     '#workbench-tool-bar-toolbarVideoCutout',
+                    'div[id="workbench-tool-bar-toolbarVideoCutout"]',
+                    'xpath//div[@id="workbench-tool-bar-toolbarVideoCutout"]',
+                    'xpath//p[text()="Smart tools"]/ancestor::div[contains(@class, "workbench-tool-bar")]',
+                    'xpath//div[contains(@class, "tool-bar-title") and text()="Smart tools"]',
                     '[data-testid="toolbar-video-cutout"]',
                     'div[aria-label="Cutout"]',
-                    'div[aria-label="Remove background"]'
+                    'div[aria-label="Remove background"]',
+                    'div[aria-label="Smart tools"]'
                 ];
 
                 let cutoutClicked = false;
@@ -1101,7 +1106,14 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 // Try to find and click the cutout button
                 for (const selector of cutoutSelectors) {
                     try {
-                        const element = await page.waitForSelector(selector, { visible: true, timeout: 2000 });
+                        let element;
+                        if (selector.startsWith('xpath')) {
+                            const xpath = selector.replace('xpath', '');
+                            element = await page.waitForXPath(xpath, { visible: true, timeout: 2000 });
+                        } else {
+                            element = await page.waitForSelector(selector, { visible: true, timeout: 2000 });
+                        }
+
                         if (element) {
                             await element.click();
                             console.log(`✅ Clicked video cutout button with selector: ${selector}`);
@@ -1118,10 +1130,10 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                     console.log('⚠️ Standard cutout selectors failed, trying text search...');
                     try {
                         const cutoutButton = await page.evaluateHandle(() => {
-                            const elements = Array.from(document.querySelectorAll('div, span, button'));
+                            const elements = Array.from(document.querySelectorAll('div, span, button, p'));
                             return elements.find(el => {
                                 const text = el.innerText?.trim();
-                                return text === 'Cutout' || text === 'Remove background';
+                                return text === 'Cutout' || text === 'Remove background' || text === 'Smart tools';
                             });
                         });
 
