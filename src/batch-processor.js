@@ -285,26 +285,33 @@ class BatchProcessor {
     }
 
     /**
-     * Get count of downloaded files waiting in uploads directory
+     * Get count of running yt-dlp and ffmpeg processes
      */
-    getDownloadedFilesCount() {
-        try {
-            const uploadsDir = path.join(__dirname, '../uploads');
-            if (!fs.existsSync(uploadsDir)) {
-                return 0;
-            }
+    async getRunningProcessCount() {
+        return new Promise((resolve) => {
+            const { exec } = require('child_process');
+            // Check for both yt-dlp.exe and ffmpeg.exe
+            exec('tasklist /FO CSV /NH', (error, stdout, stderr) => { // Removed /FI filters to parse in JS
+                if (error) {
+                    console.log('⚠️ Error checking processes:', error.message);
+                    resolve(0);
+                    return;
+                }
 
-            const files = fs.readdirSync(uploadsDir);
-            const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv'];
-            const videoFiles = files.filter(file => {
-                const ext = path.extname(file).toLowerCase();
-                return videoExtensions.includes(ext);
+                // Count lines that contain yt-dlp.exe or ffmpeg.exe
+                const lines = stdout.split('\n');
+                const processCount = lines.filter(line =>
+                    line.toLowerCase().includes('yt-dlp.exe') ||
+                    line.toLowerCase().includes('ffmpeg.exe')
+                ).length;
+
+                if (processCount > 0) {
+                    // console.log(`📊 Current running processes: ${processCount} (yt-dlp/ffmpeg)`);
+                }
+
+                resolve(processCount);
             });
-            return videoFiles.length;
-        } catch (error) {
-            console.error('❌ Error counting downloaded files:', error.message);
-            return 0;
-        }
+        });
     }
 
     /**
@@ -324,18 +331,18 @@ class BatchProcessor {
                 // Check for running automations first (hard limit of 3)
                 const runningCount = this.getRunningAutomationsCount();
 
-                // Check for downloaded files waiting to be processed
-                const downloadedCount = this.getDownloadedFilesCount();
+                // Check for running processes (yt-dlp/ffmpeg)
+                const runningProcessCount = await this.getRunningProcessCount();
 
-                // Combined limit: running automations + waiting downloads should not exceed 3
+                // Combined limit: running automations + running processes should not exceed 3
                 // This prevents downloading more videos than we can process
-                if (downloadedCount >= 3) {
-                    console.log(`⏳ Download limit reached (${downloadedCount} files waiting) - waiting for processing...`);
+                if (runningProcessCount >= 3) {
+                    console.log(`⏳ Process limit reached (${runningProcessCount} yt-dlp/ffmpeg processes running) - waiting for processing...`);
                     await new Promise(resolve => setTimeout(resolve, 60000)); // Wait 1 minute
                     continue;
                 }
 
-                console.log(`🔍 DEBUG: Currently ${runningCount} automations running, ${downloadedCount} files waiting`);
+                console.log(`🔍 DEBUG: Currently ${runningCount} automations running, ${runningProcessCount} processes active`);
 
                 // Check if we recently started automations (within last 2 minutes) and they haven't been marked as running yet
                 const timeSinceLastStart = Date.now() - this.lastStartTime;

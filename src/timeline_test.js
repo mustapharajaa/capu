@@ -1249,6 +1249,7 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                 // Stuck detection variables
                 let currentAttemptStartTime = Date.now();
                 let stuckTimeout = 6 * 60 * 1000; // Start with 6 minutes for first attempt
+                let lastProgressPercentage = 0;
 
                 while (!backgroundRemovalComplete && retryCount <= maxRetries && (Date.now() - startTime < maxDuration)) {
                     try {
@@ -1340,7 +1341,8 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
 
                                     // Reset stuck detection for the new attempt
                                     currentAttemptStartTime = Date.now();
-                                    stuckTimeout = 60 * 1000; // Reduce timeout to 1 minute for retries
+                                    // stuckTimeout = 60 * 1000; // KEEP 6 MINUTES as per user request
+                                    lastProgressPercentage = 0; // Reset percentage
 
                                     await page.waitForTimeout(2000);
                                 } catch (retryError) {
@@ -1355,10 +1357,11 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                             // RUNNING - Active Hover Monitoring
 
                             // Check for stuck state (running too long without completion)
-                            if (Date.now() - currentAttemptStartTime > stuckTimeout) {
+                            // ONLY if stuck at 99% for more than 6 minutes
+                            if (lastProgressPercentage === 99 && (Date.now() - currentAttemptStartTime > stuckTimeout)) {
                                 const stuckDurationSec = stuckTimeout / 1000;
-                                console.log(`⚠️ Background removal stuck for ${stuckDurationSec}s. Forcing retry...`);
-                                if (progressCallback) progressCallback(`⚠️ Stuck for ${stuckDurationSec}s. Forcing retry...`);
+                                console.log(`⚠️ Background removal stuck at 99% for ${stuckDurationSec}s. Forcing retry...`);
+                                if (progressCallback) progressCallback(`⚠️ Stuck at 99% for ${stuckDurationSec}s. Forcing retry...`);
 
                                 // Force switch OFF to trigger failure/retry logic in next iteration
                                 try {
@@ -1412,9 +1415,15 @@ async function runSimpleUpload(videoPath, progressCallback, originalUrl = '') {
                                 if (progressText) {
                                     console.log(`📊 Progress detected: ${progressText}`);
                                     if (progressCallback) progressCallback(`📊 Processing: ${progressText}`);
+
+                                    // Extract percentage number
+                                    const match = progressText.match(/(\d{1,3})%/);
+                                    if (match) {
+                                        lastProgressPercentage = parseInt(match[1]);
+                                    }
                                 } else {
                                     // If no text found, just log running
-                                    // console.log('⏳ Background removal in progress...'); 
+                                    // console.log('⏳ Background removal in progress...');
                                 }
 
                             } catch (hoverError) {
